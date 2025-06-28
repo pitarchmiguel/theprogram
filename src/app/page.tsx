@@ -169,7 +169,7 @@ export default function Home() {
                 <Card key={workout.id} className="overflow-hidden">
                   <CardContent className="space-y-24 pt-2">
                     {blocks.length > 0 ? (
-                      blocks.map((block, index) => {
+                      blocks.map((block) => {
                         if (!block || !block.id) return null
                         
                         const isNotesVisible = visibleNotes.has(block.id)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner'
 import { getWorkoutsByDateRange, deleteWorkout, createWorkout, type Workout, type Block } from '@/lib/supabase'
 
-export default function ManageWorkoutsPage() {
+function ManageWorkoutsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
@@ -50,7 +50,7 @@ export default function ManageWorkoutsPage() {
   const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
   const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
 
-  const loadWeekWorkouts = async () => {
+  const loadWeekWorkouts = useCallback(async () => {
     try {
       const startDate = format(weekStart, 'yyyy-MM-dd')
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd')
@@ -59,7 +59,7 @@ export default function ManageWorkoutsPage() {
     } catch (error) {
       console.error('Error loading week workouts:', error)
     }
-  }
+  }, [weekStart])
 
   const handleDeleteWorkout = async (workoutId: string) => {
     setWorkoutToDelete(workoutId)
@@ -72,7 +72,7 @@ export default function ManageWorkoutsPage() {
       await deleteWorkout(workoutToDelete)
       toast.success('Entrenamiento eliminado')
       loadWeekWorkouts()
-    } catch (error) {
+    } catch {
       toast.error('Error al eliminar el entrenamiento')
     } finally {
       setWorkoutToDelete(null)
@@ -166,7 +166,7 @@ export default function ManageWorkoutsPage() {
   // Cargar entrenamientos de la semana cuando cambie la semana
   useEffect(() => {
     loadWeekWorkouts()
-  }, [currentWeek])
+  }, [currentWeek, loadWeekWorkouts])
 
   // Contar bloques válidos
   const validBlocksCount = blocks.filter(block => 
@@ -252,7 +252,7 @@ export default function ManageWorkoutsPage() {
                         {dayWorkouts.map((workout) => (
                           <Card key={workout.id} className="p-3">
                             <div className="space-y-2">
-                              {workout.blocks?.map((block, index) => (
+                              {workout.blocks?.map((block) => (
                                 <div key={block.id} className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 flex-1 min-w-0">
                                     <span className="font-bold text-primary text-sm">{block.letter}</span>
@@ -448,16 +448,7 @@ export default function ManageWorkoutsPage() {
                       size="sm"
                       disabled={isSubmitting || validBlocksCount === 0}
                     >
-                      {isSubmitting ? 'Guardando...' : 'Guardar'}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => router.back()}
-                      disabled={isSubmitting}
-                    >
-                      Cancelar
+                      {isSubmitting ? 'Guardando...' : 'Guardar Entrenamiento'}
                     </Button>
                   </div>
                 </form>
@@ -467,8 +458,8 @@ export default function ManageWorkoutsPage() {
         </div>
       </main>
 
-      {/* Alert Dialog para confirmar eliminación */}
-      <AlertDialog open={!!workoutToDelete} onOpenChange={(open) => !open && setWorkoutToDelete(null)}>
+      {/* Dialog de confirmación de eliminación */}
+      <AlertDialog open={!!workoutToDelete} onOpenChange={() => setWorkoutToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar entrenamiento?</AlertDialogTitle>
@@ -485,5 +476,13 @@ export default function ManageWorkoutsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+export default function ManageWorkoutsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center">Cargando...</div>}>
+      <ManageWorkoutsContent />
+    </Suspense>
   )
 } 
