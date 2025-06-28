@@ -19,7 +19,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { getWorkoutsByDateRange, deleteWorkout, createWorkout, type Workout, type Block } from '@/lib/supabase'
@@ -32,7 +31,6 @@ export default function ManageWorkoutsPage() {
   const [selectedDate, setSelectedDate] = useState(dateParam ? new Date(dateParam) : new Date())
   const [currentWeek, setCurrentWeek] = useState(dateParam ? new Date(dateParam) : new Date())
   const [weekWorkouts, setWeekWorkouts] = useState<Workout[]>([])
-  const [loading, setLoading] = useState(true)
   const [blocks, setBlocks] = useState<Block[]>([
     {
       id: '1',
@@ -54,15 +52,12 @@ export default function ManageWorkoutsPage() {
 
   const loadWeekWorkouts = async () => {
     try {
-      setLoading(true)
       const startDate = format(weekStart, 'yyyy-MM-dd')
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd')
       const data = await getWorkoutsByDateRange(startDate, endDate)
       setWeekWorkouts(data || [])
     } catch (error) {
       console.error('Error loading week workouts:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -130,9 +125,10 @@ export default function ManageWorkoutsPage() {
         notes: ''
       }])
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding workout:', error)
-      setError(error.message || 'Error al guardar el entrenamiento. Inténtalo de nuevo.')
+      const errorMessage = error instanceof Error ? error.message : 'Error al guardar el entrenamiento. Inténtalo de nuevo.'
+      setError(errorMessage)
     } finally {
       setIsSubmitting(false)
     }

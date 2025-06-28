@@ -7,10 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
 
+interface TestData {
+  url: string
+  hasKey: boolean
+  keyLength: number
+  tableAccess: string
+}
+
 export default function TestConnectionPage() {
   const [connectionStatus, setConnectionStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
-  const [testData, setTestData] = useState<any>(null)
+  const [testData, setTestData] = useState<TestData | null>(null)
 
   useEffect(() => {
     testConnection()
@@ -30,7 +37,7 @@ export default function TestConnectionPage() {
       }
 
       // Test 2: Intentar conectar con Supabase
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('workouts')
         .select('count')
         .limit(1)
@@ -47,9 +54,10 @@ export default function TestConnectionPage() {
         tableAccess: 'OK'
       })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setConnectionStatus('error')
-      setErrorMessage(error.message || 'Error desconocido')
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+      setErrorMessage(errorMessage)
       console.error('Error de conexión:', error)
     }
   }
@@ -69,7 +77,7 @@ export default function TestConnectionPage() {
         ]
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('workouts')
         .insert([testWorkout])
         .select()
@@ -81,8 +89,9 @@ export default function TestConnectionPage() {
       alert('¡Test de inserción exitoso! Se creó un entrenamiento de prueba.')
       testConnection() // Recargar datos
 
-    } catch (error: any) {
-      alert(`Error en test de inserción: ${error.message}`)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+      alert(`Error en test de inserción: ${errorMessage}`)
     }
   }
 
@@ -177,7 +186,7 @@ export default function TestConnectionPage() {
               <ul className="list-disc list-inside space-y-1 mt-2 text-muted-foreground">
                 <li>Verifica que el archivo .env.local existe</li>
                 <li>Comprueba que las credenciales son correctas</li>
-                <li>Asegúrate de que la tabla 'workouts' existe</li>
+                <li>Asegúrate de que la tabla &apos;workouts&apos; existe</li>
                 <li>Revisa que RLS esté configurado correctamente</li>
               </ul>
             </div>

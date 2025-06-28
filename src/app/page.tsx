@@ -1,17 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Clock, Target, Dumbbell, XCircle, Eye, EyeOff } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Dumbbell, XCircle, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { getWorkoutsByDate, type Workout, type Block } from '@/lib/supabase'
+import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
 
 export default function Home() {
-  const router = useRouter()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentWeek, setCurrentWeek] = useState(new Date())
