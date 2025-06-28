@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Plus, ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
