@@ -1,103 +1,234 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { ChevronLeft, ChevronRight, Clock, Target, Dumbbell, XCircle, Eye, EyeOff } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { getWorkoutsByDate, type Workout, type Block } from '@/lib/supabase'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const router = useRouter()
+  const [workouts, setWorkouts] = useState<Workout[]>([])
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [currentWeek, setCurrentWeek] = useState(new Date())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+
+  const workoutsForSelectedDate = workouts.filter(workout => 
+    workout && workout.date && isSameDay(new Date(workout.date), selectedDate)
+  )
+
+  const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
+  const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
+
+  const toggleNotes = (blockId: string) => {
+    setVisibleNotes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(blockId)) {
+        newSet.delete(blockId)
+      } else {
+        newSet.add(blockId)
+      }
+      return newSet
+    })
+  }
+
+  // Cargar entrenamientos cuando cambie la fecha seleccionada
+  useEffect(() => {
+    const loadWorkouts = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const dateStr = format(selectedDate, 'yyyy-MM-dd')
+        const data = await getWorkoutsByDate(dateStr)
+        setWorkouts(data || [])
+      } catch (error) {
+        console.error('Error loading workouts:', error)
+        setError('Error al cargar los entrenamientos')
+        setWorkouts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadWorkouts()
+  }, [selectedDate])
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-4 space-y-4 max-w-md mx-auto">
+        {/* Calendario Semanal */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" onClick={prevWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h2 className="text-base font-semibold">
+              {format(weekStart, 'MMMM yyyy', { locale: es })}
+            </h2>
+            <Button variant="ghost" size="sm" onClick={nextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map((day) => {
+              const dayWorkouts = workouts.filter(workout => 
+                workout && workout.date && isSameDay(new Date(workout.date), day)
+              )
+              const isSelected = selectedDate && isSameDay(day, selectedDate)
+              const isToday = isSameDay(day, new Date())
+
+              return (
+                <div
+                  key={day.toISOString()}
+                  className="relative p-2 text-center cursor-pointer"
+                  onClick={() => setSelectedDate(day)}
+                >
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    {format(day, 'EEE', { locale: es })}
+                  </div>
+                  <div className={`
+                    relative w-8 h-8 mx-auto rounded-full flex items-center justify-center text-sm font-medium transition-colors
+                    ${isSelected 
+                      ? 'bg-primary text-primary-foreground' 
+                      : isToday 
+                        ? 'bg-muted text-foreground' 
+                        : 'hover:bg-muted/50 text-foreground'
+                    }
+                  `}>
+                    {format(day, 'd')}
+                    
+                    {/* Indicador de entrenamientos */}
+                    {dayWorkouts.length > 0 && (
+                      <div className="absolute -top-1 -right-1">
+                        <Badge variant="secondary" className="h-4 w-4 p-0 text-xs flex items-center justify-center min-w-0">
+                          {dayWorkouts.length}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Lista de Entrenamientos */}
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold">
+            {format(selectedDate, 'EEEE, d MMMM', { locale: es })}
+          </h3>
+          
+          {error ? (
+            <Card className="p-6 text-center border-destructive">
+              <div className="text-destructive">
+                <XCircle className="h-12 w-12 mx-auto mb-4" />
+                <p>{error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                  className="mt-4"
+                >
+                  Reintentar
+                </Button>
+              </div>
+            </Card>
+          ) : loading ? (
+            <Card className="p-6 text-center">
+              <div className="text-muted-foreground">
+                <Dumbbell className="h-12 w-12 mx-auto mb-4 opacity-50 animate-pulse" />
+                <p>Cargando entrenamientos...</p>
+              </div>
+            </Card>
+          ) : workoutsForSelectedDate.length === 0 ? (
+            <Card className="p-6 text-center">
+              <div className="text-muted-foreground">
+                <Dumbbell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No hay entrenamientos programados para este día</p>
+              </div>
+            </Card>
+          ) : (
+            workoutsForSelectedDate.map((workout) => {
+              // Verificar que el workout y sus bloques sean válidos
+              if (!workout || !workout.blocks) {
+                return null
+              }
+
+              const blocks = Array.isArray(workout.blocks) ? workout.blocks : []
+              
+              return (
+                <Card key={workout.id} className="overflow-hidden">
+                  <CardContent className="space-y-24 pt-2">
+                    {blocks.length > 0 ? (
+                      blocks.map((block, index) => {
+                        if (!block || !block.id) return null
+                        
+                        const isNotesVisible = visibleNotes.has(block.id)
+                        
+                        return (
+                          <div key={block.id} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-primary text-lg">{block.letter || '?'}</span>
+                              <span className="font-medium text-sm">{block.title || 'Sin título'}</span>
+                            </div>
+                            {block.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {block.description}
+                              </p>
+                            )}
+                            {block.notes && block.notes.trim() && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleNotes(block.id)}
+                                  className="h-6 text-xs hover:bg-transparent p-0"
+                                >
+                                  {isNotesVisible ? (
+                                    <>
+                                      Ocultar notas
+                                      <EyeOff className="h-3 w-3 ml-1" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      Ver notas
+                                      <Eye className="h-3 w-3 ml-1" />
+                                    </>
+                                  )}
+                                </Button>
+                                {isNotesVisible && (
+                                  <div className="text-xs text-muted-foreground italic bg-muted p-2 rounded">
+                                    {block.notes}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        No hay bloques definidos para este entrenamiento
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            }).filter(Boolean)
+          )}
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
