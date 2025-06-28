@@ -1,13 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns'
+import { useRouter } from 'next/navigation'
+import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Dumbbell, XCircle, Eye, EyeOff } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default function Home() {
   const [workouts, setWorkouts] = useState<Workout[]>([])

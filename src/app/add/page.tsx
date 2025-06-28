@@ -23,6 +23,10 @@ import {
 import { toast } from 'sonner'
 import { getWorkoutsByDateRange, deleteWorkout, createWorkout, type Workout, type Block } from '@/lib/supabase'
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 function ManageWorkoutsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
