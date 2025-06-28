@@ -184,9 +184,9 @@ export default function Home() {
                               <span className="font-medium text-sm">{block.title || 'Sin título'}</span>
                             </div>
                             {block.description && (
-                              <p className="text-sm text-muted-foreground">
+                              <div className="text-sm text-muted-foreground whitespace-pre-wrap">
                                 {block.description}
-                              </p>
+                              </div>
                             )}
                             {block.notes && block.notes.trim() && (
                               <>
@@ -209,7 +209,7 @@ export default function Home() {
                                   )}
                                 </Button>
                                 {isNotesVisible && (
-                                  <div className="text-xs text-muted-foreground italic bg-muted p-2 rounded">
+                                  <div className="text-xs text-muted-foreground italic bg-muted p-2 rounded whitespace-pre-wrap">
                                     {block.notes}
                                   </div>
                                 )}
