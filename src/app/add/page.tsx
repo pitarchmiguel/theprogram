@@ -25,7 +25,6 @@ import { getWorkoutsByDateRange, deleteWorkout, createWorkout, type Workout, typ
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 function ManageWorkoutsContent() {
   const router = useRouter()
