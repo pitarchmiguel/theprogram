@@ -34,6 +34,7 @@ export async function verifyCredentials(username: string, password: string): Pro
     }
 
     // Retornar usuario sin la contraseña
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, ...userWithoutPassword } = user
     return userWithoutPassword as User
   } catch (error) {
@@ -71,6 +72,7 @@ export async function createUser(userData: {
     }
 
     // Retornar usuario sin la contraseña
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, ...userWithoutPassword } = user
     return userWithoutPassword as User
   } catch (error) {
@@ -93,6 +95,7 @@ export async function getUserById(id: string): Promise<User | null> {
     }
 
     // Retornar usuario sin la contraseña
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, ...userWithoutPassword } = user
     return userWithoutPassword as User
   } catch (error) {

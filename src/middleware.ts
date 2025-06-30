@@ -1,8 +1,8 @@
-import { auth } from "@/auth"
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth
-  const { nextUrl } = req
+export async function middleware(request: NextRequest) {
+  const { nextUrl } = request
 
   // Rutas públicas que no requieren autenticación
   const publicRoutes = ['/', '/login', '/test-connection']
@@ -10,26 +10,19 @@ export default auth((req) => {
 
   // Si es una ruta pública, permitir acceso
   if (isPublicRoute) {
-    // Si está logueado y va a login, redirigir a /add
-    if (isLoggedIn && nextUrl.pathname === '/login') {
-      return Response.redirect(new URL('/add', nextUrl))
-    }
-    return null
+    return NextResponse.next()
   }
 
   // Proteger solo las rutas de administración
   if (nextUrl.pathname.startsWith('/add')) {
-    if (!isLoggedIn) {
-      // Guardar la URL original para redirigir después del login
-      const loginUrl = new URL('/login', nextUrl)
-      loginUrl.searchParams.set('callbackUrl', nextUrl.pathname)
-      return Response.redirect(loginUrl)
-    }
+    // Por ahora, permitir acceso a todas las rutas
+    // La autenticación se manejará en el lado del cliente
+    return NextResponse.next()
   }
 
   // Permitir acceso a todas las demás rutas
-  return null
-})
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [
