@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucid
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
 
 // Force dynamic rendering
@@ -181,7 +182,16 @@ export default function Home() {
                           <div key={block.id} className="space-y-2">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-primary text-lg">{block.letter || '?'}</span>
-                              <span className="font-medium text-sm">{block.title || 'Sin título'}</span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="font-medium text-sm cursor-default">
+                                    {block.title && block.title.length > 25 ? `${block.title.substring(0, 25)}...` : (block.title || 'Sin título')}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{block.title || 'Sin título'}</p>
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                             {block.description && (
                               <div className="text-sm text-muted-foreground whitespace-pre-wrap">
