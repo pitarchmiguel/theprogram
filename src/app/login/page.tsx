@@ -1,72 +1,38 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { signIn, useSession } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle, Dumbbell, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
+import { createClient } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
-      <LoginPageContent />
-    </Suspense>
-  )
-}
-
-function LoginPageContent() {
-  const [username, setUsername] = useState('')
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { data: session, status } = useSession()
+  const { signIn, loading: authLoading } = useAuth()
+  const supabase = createClient()
 
-  // Redirigir si ya está autenticado
-  useEffect(() => {
-    if (status === 'authenticated' && session) {
-      const callbackUrl = searchParams.get('callbackUrl') || '/add'
-      router.push(callbackUrl)
-    }
-  }, [session, status, router, searchParams])
-
-  // Mostrar loading mientras verifica la sesión
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Verificando sesión...</span>
-        </div>
-      </div>
-    )
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
     try {
-      const callbackUrl = searchParams.get('callbackUrl') || '/add'
-      
-      const result = await signIn('credentials', {
-        username,
-        password,
-        redirect: false,
-      })
+      const { error } = await signIn(email, password)
 
-      if (result?.error) {
+      if (error) {
         setError('Credenciales incorrectas')
         toast.error('Error de autenticación')
-      } else if (result?.ok) {
+      } else {
         toast.success('¡Bienvenido!')
-        router.push(callbackUrl)
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -75,6 +41,57 @@ function LoginPageContent() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+            role: 'athlete'
+          }
+        }
+      })
+
+      if (error) {
+        setError(error.message)
+        toast.error('Error en el registro')
+      } else {
+        toast.success('¡Registro exitoso! Revisa tu email para confirmar tu cuenta.')
+        // Reset form
+        setName('')
+        setEmail('')
+        setPassword('')
+        setIsLoginMode(true)
+      }
+    } catch (error) {
+      console.error('Register error:', error)
+      setError('Error de conexión')
+      toast.error('Error de conexión')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSubmit = isLoginMode ? handleLogin : handleRegister
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Verificando sesión...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -88,7 +105,7 @@ function LoginPageContent() {
           </div>
           <CardTitle className="text-2xl font-bold">The Program</CardTitle>
           <p className="text-muted-foreground">
-            Accede al panel de administración
+            {isLoginMode ? 'Accede al panel de administración' : 'Regístrate como atleta'}
           </p>
         </CardHeader>
         <CardContent>
@@ -102,17 +119,33 @@ function LoginPageContent() {
               </div>
             )}
 
+            {!isLoginMode && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nombre"
+                  required={!isLoginMode}
+                  disabled={isLoading}
+                  autoComplete="name"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="username">Usuario</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Ingresa tu usuario"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Ingresa tu email"
                 required
                 disabled={isLoading}
-                autoComplete="username"
+                autoComplete="email"
               />
             </div>
 
@@ -126,7 +159,7 @@ function LoginPageContent() {
                 placeholder="Ingresa tu contraseña"
                 required
                 disabled={isLoading}
-                autoComplete="current-password"
+                autoComplete={isLoginMode ? "current-password" : "new-password"}
               />
             </div>
 
@@ -138,12 +171,31 @@ function LoginPageContent() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Iniciando sesión...
+                  {isLoginMode ? 'Iniciando sesión...' : 'Registrando...'}
                 </>
               ) : (
-                'Iniciar Sesión'
+                isLoginMode ? 'Iniciar Sesión' : 'Registrarse'
               )}
             </Button>
+
+            <div className="text-center pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoginMode(!isLoginMode)
+                  setError('')
+                  setName('')
+                  setEmail('')
+                  setPassword('')
+                }}
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                {isLoginMode 
+                  ? '¿No tienes cuenta? Regístrate aquí' 
+                  : '¿Ya tienes cuenta? Inicia sesión aquí'
+                }
+              </button>
+            </div>
           </form>
         </CardContent>
       </Card>

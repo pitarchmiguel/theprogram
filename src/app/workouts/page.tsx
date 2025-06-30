@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Plus, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Plus, Settings, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
-export default function Home() {
+export default function WorkoutsPage() {
   const router = useRouter()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -26,16 +26,12 @@ export default function Home() {
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
   const { requireAuth, loading: authLoading, userRole, user, signOut } = useAuth()
 
-  // Check authentication and redirect master users
+  // Check authentication
   useEffect(() => {
     if (!authLoading) {
-      requireAuth()
-      // Redirect master users to workouts page
-      if (userRole === 'master') {
-        router.push('/workouts')
-      }
+      requireAuth('master')
     }
-  }, [authLoading, requireAuth, userRole, router])
+  }, [authLoading, requireAuth])
 
   // Cargar entrenamientos cuando cambie la fecha seleccionada
   useEffect(() => {
@@ -94,46 +90,48 @@ export default function Home() {
 
   const handleSignOut = async () => {
     await signOut()
+    router.push('/login')
   }
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header with navigation */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-primary rounded-full">
-              <Dumbbell className="h-5 w-5 text-primary-foreground" />
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary rounded-full">
+                  <Dumbbell className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <h1 className="text-lg font-semibold">The Program</h1>
+              </div>
             </div>
-            <h1 className="text-lg font-semibold">The Program</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {userRole === 'master' && (
+            <div className="flex items-center gap-3">
+              {user && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">
+                    {user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario'}
+                  </span>
+                </div>
+              )}
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => router.push('/add')}
-                className="flex items-center gap-2"
+                className="p-2"
               >
-                <Plus className="h-4 w-4" />
-                Administrar
+                <Settings className="h-4 w-4" />
               </Button>
-            )}
-            {userRole === 'athlete' && user && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {user.user_metadata?.name || user.email?.split('@')[0] || 'Atleta'}
-                </span>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="p-2"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="p-2"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -311,4 +309,4 @@ export default function Home() {
       </main>
     </div>
   )
-}
+} 

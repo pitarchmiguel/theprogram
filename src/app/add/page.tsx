@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle, LogOut } from 'lucide-react'
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle, LogOut, Dumbbell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,7 +30,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import { getWorkoutsByDateRange, deleteWorkout, createWorkout, type Workout, type Block } from '@/lib/supabase'
-import { signOut } from 'next-auth/react'
+import { useAuth } from '@/hooks/useAuth'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -39,6 +39,7 @@ function ManageWorkoutsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
+  const { requireAuth, loading: authLoading, signOut } = useAuth()
   
   const [selectedDate, setSelectedDate] = useState(dateParam ? new Date(dateParam) : new Date())
   const [currentWeek, setCurrentWeek] = useState(dateParam ? new Date(dateParam) : new Date())
@@ -60,11 +61,12 @@ function ManageWorkoutsContent() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-
-  const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
-  const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
+  // Check authentication and role
+  useEffect(() => {
+    if (!authLoading) {
+      requireAuth('master')
+    }
+  }, [authLoading, requireAuth])
 
   // Check if mobile on mount and resize
   useEffect(() => {
@@ -77,6 +79,9 @@ function ManageWorkoutsContent() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+
   const loadWeekWorkouts = useCallback(async () => {
     try {
       const startDate = format(weekStart, 'yyyy-MM-dd')
@@ -87,6 +92,26 @@ function ManageWorkoutsContent() {
       console.error('Error loading week workouts:', error)
     }
   }, [weekStart])
+
+  // Cargar entrenamientos de la semana cuando cambie la semana
+  useEffect(() => {
+    loadWeekWorkouts()
+  }, [currentWeek, loadWeekWorkouts])
+
+  const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
+  const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <span>Verificando permisos...</span>
+        </div>
+      </div>
+    )
+  }
 
   const handleDeleteWorkout = async (workoutId: string) => {
     setWorkoutToDelete(workoutId)
@@ -197,6 +222,10 @@ function ManageWorkoutsContent() {
     setIsEditDialogOpen(true)
   }
 
+  const handleSignOut = async () => {
+    await signOut()
+  }
+
   const handleUpdateWorkout = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -252,11 +281,6 @@ function ManageWorkoutsContent() {
       setIsSubmitting(false)
     }
   }
-
-  // Cargar entrenamientos de la semana cuando cambie la semana
-  useEffect(() => {
-    loadWeekWorkouts()
-  }, [currentWeek, loadWeekWorkouts])
 
   // Contar bloques válidos
   const validBlocksCount = blocks.filter(block => 
@@ -592,21 +616,32 @@ function ManageWorkoutsContent() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => router.back()}
+                onClick={() => router.push('/workouts')}
                 className="p-2"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <h1 className="text-lg font-semibold">Gestionar Entrenamientos</h1>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => signOut()}
-              className="p-2"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/workouts')}
+                className="flex items-center gap-2"
+              >
+                <Dumbbell className="h-4 w-4" />
+                Entrenamientos
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="p-2"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
