@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Plus, Settings, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Settings, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -24,7 +24,7 @@ export default function WorkoutsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
-  const { requireAuth, loading: authLoading, userRole, user, signOut } = useAuth()
+  const { requireAuth, loading: authLoading, user, signOut } = useAuth()
 
   // Check authentication
   useEffect(() => {
