@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle, LogOut, Dumbbell, Settings } from 'lucide-react'
+import { AdminHeader } from '@/components/admin-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -609,51 +610,11 @@ function ManageWorkoutsContent() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/workouts')}
-                className="p-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-lg font-semibold">Gestionar Entrenamientos</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/workouts')}
-                className="flex items-center gap-2"
-              >
-                <Dumbbell className="h-4 w-4" />
-                Entrenamientos
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/admin/users')}
-                className="flex items-center gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Admin
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="p-2"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AdminHeader 
+        title="Gestionar Entrenamientos" 
+        showBackButton={true} 
+        backUrl="/workouts" 
+      />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">

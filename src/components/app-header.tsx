@@ -1,0 +1,80 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { Dumbbell, Settings, LogOut, Plus, ChevronDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/hooks/useAuth'
+
+interface AppHeaderProps {
+  title?: string
+}
+
+export function AppHeader({ title = "The Program" }: AppHeaderProps) {
+  const router = useRouter()
+  const { user, userRole, signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
+
+  return (
+    <header className="border-b bg-card">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-primary rounded-full">
+            <Dumbbell className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <h1 className="text-lg font-semibold">{title}</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          {user && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-lg">
+              <span className="text-sm font-medium">
+                {user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario'}
+              </span>
+            </div>
+          )}
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {userRole === 'master' ? 'Administración' : 'Menú'}
+                  </span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {userRole === 'master' && (
+                  <>
+                    <DropdownMenuItem onClick={() => router.push('/add')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Gestionar Entrenamientos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/admin/users')}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Gestionar Usuarios
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Cerrar Sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+} 

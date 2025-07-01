@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Plus, LogOut } from 'lucide-react'
+import { AppHeader } from '@/components/app-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -99,44 +100,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header with navigation */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-primary rounded-full">
-              <Dumbbell className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-lg font-semibold">The Program</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {userRole === 'master' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/add')}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Administrar
-              </Button>
-            )}
-            {userRole === 'athlete' && user && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {user.user_metadata?.name || user.email?.split('@')[0] || 'Atleta'}
-                </span>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="p-2"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-4 space-y-4 max-w-md mx-auto">

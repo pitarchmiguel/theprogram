@@ -4,14 +4,21 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Settings, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Settings, LogOut, Plus, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { AppHeader } from '@/components/app-header'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -24,14 +31,19 @@ export default function WorkoutsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
-  const { requireAuth, loading: authLoading, user, signOut } = useAuth()
+  const { requireAuth, loading: authLoading, user, userRole, signOut } = useAuth()
 
   // Check authentication
   useEffect(() => {
     if (!authLoading) {
-      requireAuth('master')
+      // Solo verificar si no hay usuario o si el usuario no es master
+      if (!user) {
+        router.push('/login')
+      } else if (userRole !== 'master') {
+        router.push('/')
+      }
     }
-  }, [authLoading, requireAuth])
+  }, [authLoading, user, userRole, router])
 
   // Cargar entrenamientos cuando cambie la fecha seleccionada
   useEffect(() => {
@@ -96,45 +108,7 @@ export default function WorkoutsPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header with navigation */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-primary rounded-full">
-                  <Dumbbell className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <h1 className="text-lg font-semibold">The Program</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {user && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">
-                    {user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario'}
-                  </span>
-                </div>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/add')}
-                className="p-2"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="p-2"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-4 space-y-4 max-w-md mx-auto">

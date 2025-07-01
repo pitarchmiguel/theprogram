@@ -12,37 +12,152 @@ export function useAuth() {
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        setUser(session.user)
-        const role = session.user.user_metadata?.role as 'master' | 'athlete'
-        setUserRole(role || 'athlete')
+  console.log('🔧 useAuth hook initialized')
+
+  // Función para obtener el rol desde la tabla profiles
+  const getRoleFromProfile = async (userId: string): Promise<'master' | 'athlete' | null> => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+      
+      if (error) {
+        console.error('❌ Error fetching profile:', error)
+        return null
       }
-      setLoading(false)
+      
+      console.log('📋 Profile role from database:', profile?.role)
+      return profile?.role as 'master' | 'athlete' || null
+    } catch (error) {
+      console.error('❌ Exception fetching profile:', error)
+      return null
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    console.log('🚀 useAuth useEffect started')
+
+    // Función para obtener el rol desde localStorage como fallback
+    const getRoleFromStorage = (): 'master' | 'athlete' => {
+      if (typeof window !== 'undefined') {
+        const storedRole = localStorage.getItem('userRole')
+        return (storedRole as 'master' | 'athlete') || 'athlete'
+      }
+      return 'athlete'
     }
 
-    getInitialSession()
+    // Función para guardar el rol en localStorage
+    const saveRoleToStorage = (role: 'master' | 'athlete') => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('userRole', role)
+      }
+    }
 
-    // Listen for auth changes
+    // Función simple para obtener la sesión con timeout
+    const getSession = async () => {
+      try {
+        console.log('🔄 Getting session...')
+        
+        // Usar un timeout de 3 segundos
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        })
+
+        const sessionPromise = supabase.auth.getSession()
+        
+        const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
+        
+        if (error) {
+          console.error('❌ Session error:', error)
+          // Usar fallback
+          const fallbackRole = getRoleFromStorage()
+          if (mounted) {
+            setUserRole(fallbackRole)
+            setLoading(false)
+          }
+          return
+        }
+        
+        console.log('📋 Session data:', data.session ? 'exists' : 'none')
+        
+        if (!mounted) return
+        
+        if (data.session?.user) {
+          console.log('👤 User found:', data.session.user.email)
+          setUser(data.session.user)
+          
+          // Intentar obtener el rol desde la tabla profiles primero
+          const profileRole = await getRoleFromProfile(data.session.user.id)
+          console.log('🎭 Profile role:', profileRole)
+          
+          // Si no hay rol en profile, usar user_metadata como fallback
+          const role = profileRole || data.session.user.user_metadata?.role || getRoleFromStorage()
+          console.log('🎭 Final role:', role)
+          setUserRole(role)
+          saveRoleToStorage(role)
+        } else {
+          console.log('❌ No user in session')
+          setUser(null)
+          setUserRole(null)
+        }
+      } catch (error) {
+        console.error('❌ Exception in getSession:', error)
+        // Usar fallback en caso de error
+        const fallbackRole = getRoleFromStorage()
+        if (mounted) {
+          setUserRole(fallbackRole)
+          setLoading(false)
+        }
+      } finally {
+        if (mounted) {
+          console.log('✅ Setting loading to false')
+          setLoading(false)
+        }
+      }
+    }
+
+    // Ejecutar inmediatamente
+    getSession()
+
+    // Suscripción a cambios de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔄 Auth change:', event, session ? 'with user' : 'no user')
+        
+        if (!mounted) return
+        
         if (session?.user) {
           setUser(session.user)
-          const role = session.user.user_metadata?.role as 'master' | 'athlete'
-          setUserRole(role || 'athlete')
+          
+          // Intentar obtener el rol desde la tabla profiles primero
+          const profileRole = await getRoleFromProfile(session.user.id)
+          console.log('🎭 Profile role from auth change:', profileRole)
+          
+          // Si no hay rol en profile, usar user_metadata como fallback
+          const role = profileRole || session.user.user_metadata?.role || getRoleFromStorage()
+          console.log('🎭 Final role from auth change:', role)
+          setUserRole(role)
+          saveRoleToStorage(role)
         } else {
           setUser(null)
           setUserRole(null)
         }
+        
         setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [supabase.auth])
+    return () => {
+      console.log('🧹 useAuth cleanup')
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  console.log('🔧 useAuth current state:', { user: user?.email, userRole, loading })
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -54,10 +169,20 @@ export function useAuth() {
       if (error) throw error
 
       if (data.user) {
-        const role = data.user.user_metadata?.role as 'master' | 'athlete'
-        setUserRole(role || 'athlete')
+        // Intentar obtener el rol desde la tabla profiles primero
+        const profileRole = await getRoleFromProfile(data.user.id)
+        console.log('🎭 Profile role from signIn:', profileRole)
         
-        // Redirect based on role
+        // Si no hay rol en profile, usar user_metadata como fallback
+        const role = profileRole || data.user.user_metadata?.role || 'athlete'
+        console.log('🎭 Final role from signIn:', role)
+        setUserRole(role)
+        
+        // Guardar en localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('userRole', role)
+        }
+        
         if (role === 'master') {
           router.push('/workouts')
         } else {
@@ -75,6 +200,12 @@ export function useAuth() {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
+      
+      // Limpiar localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('userRole')
+      }
+      
       router.push('/login')
     } catch (error) {
       console.error('Error signing out:', error)
@@ -82,18 +213,26 @@ export function useAuth() {
   }
 
   const requireAuth = (requiredRole?: 'master') => {
-    if (loading) return false
+    console.log('🔒 requireAuth called:', { loading, user: !!user, userRole, requiredRole })
+    
+    if (loading) {
+      console.log('⏳ Still loading, returning false')
+      return false
+    }
     
     if (!user) {
+      console.log('❌ No user, redirecting to login')
       router.push('/login')
       return false
     }
 
     if (requiredRole === 'master' && userRole !== 'master') {
+      console.log('❌ User is not master, redirecting to home')
       router.push('/')
       return false
     }
 
+    console.log('✅ Auth check passed')
     return true
   }
 

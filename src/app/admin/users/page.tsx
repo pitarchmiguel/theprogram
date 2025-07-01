@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Search, Trash2, User, Calendar, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { AdminHeader } from "@/components/admin-header";
 
 interface Profile {
   id: string;
@@ -299,11 +300,17 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
-        <p className="text-muted-foreground">Gestiona usuarios y sus roles</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <AdminHeader 
+        title="Panel de Administración" 
+        showBackButton={true} 
+        backUrl="/workouts" 
+      />
+      
+      <div className="p-8 max-w-6xl mx-auto">
+        <div className="mb-8">
+          <p className="text-muted-foreground">Gestiona usuarios y sus roles</p>
+        </div>
 
       {/* Search and Stats */}
       <Card className="mb-6">
@@ -488,6 +495,7 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 } 
