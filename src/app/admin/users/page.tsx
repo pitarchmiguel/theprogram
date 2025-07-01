@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, Trash2, User, Clock, AlertTriangle, Calendar, RefreshCw } from "lucide-react";
+import { Search, Trash2, User, Calendar, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
@@ -147,10 +147,10 @@ export default function AdminUsersPage() {
         if (profilesError) {
           console.error("Error fetching profiles:", profilesError);
           console.error("Error details:", {
-            message: (profilesError as any).message,
-            details: (profilesError as any).details,
-            hint: (profilesError as any).hint,
-            code: (profilesError as any).code
+            message: (profilesError as Error).message,
+            details: (profilesError as { details?: string }).details,
+            hint: (profilesError as { hint?: string }).hint,
+            code: (profilesError as { code?: string }).code
           });
           throw profilesError;
         }
@@ -176,7 +176,9 @@ export default function AdminUsersPage() {
       } catch (error) {
         console.error("❌ Error fetching profiles:", error);
         console.error("Error type:", typeof error);
-        console.error("Error keys:", Object.keys(error || {}));
+        if (error && typeof error === 'object') {
+          console.error("Error keys:", Object.keys(error));
+        }
         toast.error("Error al cargar usuarios");
         setProfiles([]);
         setFilteredProfiles([]);
