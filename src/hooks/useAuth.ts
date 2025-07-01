@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import type { Session } from '@supabase/supabase-js'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
