@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/useAuth'
+import { useState } from 'react'
 
 interface AppHeaderProps {
   title?: string
@@ -19,9 +20,18 @@ interface AppHeaderProps {
 export function AppHeader({ title = "The Program" }: AppHeaderProps) {
   const router = useRouter()
   const { user, userRole, signOut } = useAuth()
+  const [signingOut, setSigningOut] = useState(false)
 
   const handleSignOut = async () => {
-    await signOut()
+    setSigningOut(true)
+    try {
+      await signOut()
+    } catch (e) {
+      // Puedes mostrar un toast o alerta si quieres
+      console.error('Error al cerrar sesión', e)
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   return (
@@ -66,9 +76,16 @@ export function AppHeader({ title = "The Program" }: AppHeaderProps) {
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Cerrar Sesión
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-destructive focus:text-destructive"
+                  disabled={signingOut}
+                >
+                  {signingOut ? (
+                    <span className="flex items-center"><span className="animate-spin mr-2 h-4 w-4 border-b-2 border-destructive rounded-full"></span>Cerrando...</span>
+                  ) : (
+                    <><LogOut className="h-4 w-4 mr-2" />Cerrar Sesión</>
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

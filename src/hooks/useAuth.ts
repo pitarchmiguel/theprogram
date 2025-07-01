@@ -57,56 +57,46 @@ export function useAuth() {
       }
     }
 
-    // Función simple para obtener la sesión con timeout
+    // Función simple para obtener la sesión
     const getSession = async () => {
       try {
         console.log('🔄 Getting session...')
-        
-        // Usar un timeout de 3 segundos
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout')), 3000)
-        })
 
-        const sessionPromise = supabase.auth.getSession()
-        
-        const result = await Promise.race([sessionPromise, timeoutPromise])
-        
-        if (typeof result === 'object' && result !== null && 'data' in result && 'error' in result) {
-          const { data, error } = result as { data: { session: Session | null }, error: unknown }
-          
-          if (error) {
-            console.error('❌ Session error:', error)
-            // Usar fallback
-            const fallbackRole = getRoleFromStorage()
-            if (mounted) {
-              setUserRole(fallbackRole)
-              setLoading(false)
-            }
-            return
+        // Llama directamente a supabase.auth.getSession()
+        const { data, error } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error('❌ Session error:', error)
+          // Usar fallback
+          const fallbackRole = getRoleFromStorage()
+          if (mounted) {
+            setUserRole(fallbackRole)
+            setLoading(false)
           }
-          
-          console.log('📋 Session data:', data.session ? 'exists' : 'none')
-          
-          if (!mounted) return
-          
-          if (data.session?.user) {
-            console.log('👤 User found:', data.session.user.email)
-            setUser(data.session.user)
-            
-            // Intentar obtener el rol desde la tabla profiles primero
-            const profileRole = await getRoleFromProfile(data.session.user.id)
-            console.log('🎭 Profile role:', profileRole)
-            
-            // Si no hay rol en profile, usar user_metadata como fallback
-            const role = profileRole || data.session.user.user_metadata?.role || getRoleFromStorage()
-            console.log('🎭 Final role:', role)
-            setUserRole(role)
-            saveRoleToStorage(role)
-          } else {
-            console.log('❌ No user in session')
-            setUser(null)
-            setUserRole(null)
-          }
+          return
+        }
+
+        console.log('📋 Session data:', data.session ? 'exists' : 'none')
+
+        if (!mounted) return
+
+        if (data.session?.user) {
+          console.log('👤 User found:', data.session.user.email)
+          setUser(data.session.user)
+
+          // Intentar obtener el rol desde la tabla profiles primero
+          const profileRole = await getRoleFromProfile(data.session.user.id)
+          console.log('🎭 Profile role:', profileRole)
+
+          // Si no hay rol en profile, usar user_metadata como fallback
+          const role = profileRole || data.session.user.user_metadata?.role || getRoleFromStorage()
+          console.log('🎭 Final role:', role)
+          setUserRole(role)
+          saveRoleToStorage(role)
+        } else {
+          console.log('❌ No user in session')
+          setUser(null)
+          setUserRole(null)
         }
       } catch (error) {
         console.error('❌ Exception in getSession:', error)
@@ -203,17 +193,21 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      
-      // Limpiar localStorage
+      console.log('🔴 signOut: start');
+      const { error } = await supabase.auth.signOut();
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('userRole')
+        localStorage.removeItem('userRole');
       }
-      
-      router.push('/login')
+      if (error) throw error;
+      console.log('🔴 signOut: before redirect');
+      router.push('/login');
+      console.log('🔴 signOut: after redirect');
     } catch (error) {
-      console.error('Error signing out:', error)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('userRole');
+      }
+      router.push('/login');
+      console.error('Error signing out:', error);
     }
   }
 
