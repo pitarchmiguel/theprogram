@@ -19,6 +19,8 @@ export function useAuth() {
   // Función para obtener el rol desde la tabla profiles
   const getRoleFromProfile = useCallback(async (userId: string): Promise<'master' | 'athlete' | null> => {
     try {
+      console.log('🔍 Fetching profile for user:', userId)
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
@@ -26,14 +28,42 @@ export function useAuth() {
         .single()
       
       if (error) {
-        console.error('❌ Error fetching profile:', error)
+        // Manejo robusto de errores
+        const errorCode = error?.code || 'unknown'
+        const errorMessage = error?.message || 'No message available'
+        
+        console.log('🔍 Error details:', {
+          code: errorCode,
+          message: errorMessage,
+          fullError: error
+        })
+        
+        // Si no se encuentra el perfil (código PGRST116 o mensaje específico)
+        if (errorCode === 'PGRST116' || errorMessage.includes('No rows found')) {
+          console.log('ℹ️ No profile found, this is normal for new users. Using fallback.')
+          return null
+        }
+        
+        // Para otros errores, usar fallback silenciosamente
+        console.log('ℹ️ Profile fetch failed, using fallback role')
         return null
       }
       
-      console.log('📋 Profile role from database:', profile?.role)
-      return profile?.role as 'master' | 'athlete' || null
+      if (profile && profile.role) {
+        console.log('✅ Profile role from database:', profile.role)
+        return profile.role as 'master' | 'athlete'
+      }
+      
+      console.log('ℹ️ No role found in profile, using fallback')
+      return null
+      
     } catch (error) {
-      console.error('❌ Exception fetching profile:', error)
+      // Solo log si hay información útil
+      if (error && typeof error === 'object' && Object.keys(error).length > 0) {
+        console.log('🔍 Exception in getRoleFromProfile:', error)
+      } else {
+        console.log('ℹ️ Profile lookup failed, continuing with fallback')
+      }
       return null
     }
   }, []) // Remover dependencia de supabase
@@ -97,10 +127,15 @@ export function useAuth() {
           setUser(data.session.user)
 
           // Intentar obtener el rol desde la tabla profiles primero
-          const profileRole = await getRoleFromProfile(data.session.user.id)
-          console.log('🎭 Profile role:', profileRole)
+          let profileRole = null
+          try {
+            profileRole = await getRoleFromProfile(data.session.user.id)
+            console.log('🎭 Profile role:', profileRole)
+          } catch {
+            console.log('🎭 Profile lookup skipped due to error, using fallback')
+          }
 
-          // Si no hay rol en profile, usar user_metadata como fallback
+          // Si no hay rol en profile, usar nuser_metadata como fallback
           const role = profileRole || data.session.user.user_metadata?.role || getRoleFromStorage()
           console.log('🎭 Final role:', role)
           setUserRole(role)
@@ -140,8 +175,13 @@ export function useAuth() {
           setUser(session.user)
           
           // Intentar obtener el rol desde la tabla profiles primero
-          const profileRole = await getRoleFromProfile(session.user.id)
-          console.log('🎭 Profile role from auth change:', profileRole)
+          let profileRole = null
+          try {
+            profileRole = await getRoleFromProfile(session.user.id)
+            console.log('🎭 Profile role from auth change:', profileRole)
+          } catch {
+            console.log('🎭 Profile lookup skipped in auth change, using fallback')
+          }
           
           // Si no hay rol en profile, usar user_metadata como fallback
           const role = profileRole || session.user.user_metadata?.role || getRoleFromStorage()
@@ -177,8 +217,13 @@ export function useAuth() {
 
       if (data.user) {
         // Intentar obtener el rol desde la tabla profiles primero
-        const profileRole = await getRoleFromProfile(data.user.id)
-        console.log('🎭 Profile role from signIn:', profileRole)
+        let profileRole = null
+        try {
+          profileRole = await getRoleFromProfile(data.user.id)
+          console.log('🎭 Profile role from signIn:', profileRole)
+        } catch {
+          console.log('🎭 Profile lookup skipped in signIn, using fallback')
+        }
         
         // Si no hay rol en profile, usar user_metadata como fallback
         const role = profileRole || data.user.user_metadata?.role || 'athlete'

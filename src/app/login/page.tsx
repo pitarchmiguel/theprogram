@@ -55,6 +55,7 @@ export default function LoginPage() {
         options: {
           data: {
             name: name,
+            full_name: name,
             role: 'athlete'
           }
         }
