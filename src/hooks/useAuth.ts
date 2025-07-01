@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import type { Session } from '@supabase/supabase-js'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -15,7 +16,7 @@ export function useAuth() {
   console.log('🔧 useAuth hook initialized')
 
   // Función para obtener el rol desde la tabla profiles
-  const getRoleFromProfile = async (userId: string): Promise<'master' | 'athlete' | null> => {
+  const getRoleFromProfile = useCallback(async (userId: string): Promise<'master' | 'athlete' | null> => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -34,7 +35,7 @@ export function useAuth() {
       console.error('❌ Exception fetching profile:', error)
       return null
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
     let mounted = true
@@ -68,40 +69,44 @@ export function useAuth() {
 
         const sessionPromise = supabase.auth.getSession()
         
-        const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
+        const result = await Promise.race([sessionPromise, timeoutPromise])
         
-        if (error) {
-          console.error('❌ Session error:', error)
-          // Usar fallback
-          const fallbackRole = getRoleFromStorage()
-          if (mounted) {
-            setUserRole(fallbackRole)
-            setLoading(false)
+        if (typeof result === 'object' && result !== null && 'data' in result && 'error' in result) {
+          const { data, error } = result as { data: { session: Session | null }, error: unknown }
+          
+          if (error) {
+            console.error('❌ Session error:', error)
+            // Usar fallback
+            const fallbackRole = getRoleFromStorage()
+            if (mounted) {
+              setUserRole(fallbackRole)
+              setLoading(false)
+            }
+            return
           }
-          return
-        }
-        
-        console.log('📋 Session data:', data.session ? 'exists' : 'none')
-        
-        if (!mounted) return
-        
-        if (data.session?.user) {
-          console.log('👤 User found:', data.session.user.email)
-          setUser(data.session.user)
           
-          // Intentar obtener el rol desde la tabla profiles primero
-          const profileRole = await getRoleFromProfile(data.session.user.id)
-          console.log('🎭 Profile role:', profileRole)
+          console.log('📋 Session data:', data.session ? 'exists' : 'none')
           
-          // Si no hay rol en profile, usar user_metadata como fallback
-          const role = profileRole || data.session.user.user_metadata?.role || getRoleFromStorage()
-          console.log('🎭 Final role:', role)
-          setUserRole(role)
-          saveRoleToStorage(role)
-        } else {
-          console.log('❌ No user in session')
-          setUser(null)
-          setUserRole(null)
+          if (!mounted) return
+          
+          if (data.session?.user) {
+            console.log('👤 User found:', data.session.user.email)
+            setUser(data.session.user)
+            
+            // Intentar obtener el rol desde la tabla profiles primero
+            const profileRole = await getRoleFromProfile(data.session.user.id)
+            console.log('🎭 Profile role:', profileRole)
+            
+            // Si no hay rol en profile, usar user_metadata como fallback
+            const role = profileRole || data.session.user.user_metadata?.role || getRoleFromStorage()
+            console.log('🎭 Final role:', role)
+            setUserRole(role)
+            saveRoleToStorage(role)
+          } else {
+            console.log('❌ No user in session')
+            setUser(null)
+            setUserRole(null)
+          }
         }
       } catch (error) {
         console.error('❌ Exception in getSession:', error)
@@ -155,7 +160,7 @@ export function useAuth() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [getRoleFromProfile, supabase.auth])
 
   console.log('🔧 useAuth current state:', { user: user?.email, userRole, loading })
 

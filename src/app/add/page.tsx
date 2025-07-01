@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle, LogOut, Dumbbell, Settings } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle } from 'lucide-react'
 import { AdminHeader } from '@/components/admin-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,10 +37,9 @@ import { useAuth } from '@/hooks/useAuth'
 export const dynamic = 'force-dynamic'
 
 function ManageWorkoutsContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
-  const { requireAuth, loading: authLoading, signOut } = useAuth()
+  const { requireAuth, loading: authLoading } = useAuth()
   
   const [selectedDate, setSelectedDate] = useState(dateParam ? new Date(dateParam) : new Date())
   const [currentWeek, setCurrentWeek] = useState(dateParam ? new Date(dateParam) : new Date())
@@ -221,10 +220,6 @@ function ManageWorkoutsContent() {
       notes: ''
     }])
     setIsEditDialogOpen(true)
-  }
-
-  const handleSignOut = async () => {
-    await signOut()
   }
 
   const handleUpdateWorkout = async (e: React.FormEvent) => {

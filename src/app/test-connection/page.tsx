@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabaseClient'
 
 export default function TestConnection() {
   const [status, setStatus] = useState<string>('Testing...')
-  const [session, setSession] = useState<any>(null)
+  const [session, setSession] = useState<unknown>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -44,12 +44,10 @@ export default function TestConnection() {
         <div className="p-4 border rounded-lg">
           <p className="text-sm font-mono">{status}</p>
         </div>
-        {session && (
+        {typeof session === 'object' && session !== null && (
           <div className="p-4 border rounded-lg">
             <h2 className="font-semibold mb-2">Session Info:</h2>
-            <pre className="text-xs overflow-auto">
-              {JSON.stringify(session, null, 2)}
-            </pre>
+            <pre className="text-xs overflow-auto">{JSON.stringify(session, null, 2)}</pre>
           </div>
         )}
       </div>

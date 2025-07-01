@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Plus, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +25,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
-  const { requireAuth, loading: authLoading, userRole, user, signOut } = useAuth()
+  const { requireAuth, loading: authLoading, userRole } = useAuth()
 
   // Check authentication and redirect master users
   useEffect(() => {
@@ -91,10 +91,6 @@ export default function Home() {
       }
       return newSet
     })
-  }
-
-  const handleSignOut = async () => {
-    await signOut()
   }
 
   return (

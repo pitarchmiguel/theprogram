@@ -1,49 +1,27 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, Settings, LogOut, Plus, ChevronDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/hooks/useAuth'
 import { AppHeader } from '@/components/app-header'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
 export default function WorkoutsPage() {
-  const router = useRouter()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
-  const { requireAuth, loading: authLoading, user, userRole, signOut } = useAuth()
-
-  // Check authentication
-  useEffect(() => {
-    if (!authLoading) {
-      // Solo verificar si no hay usuario o si el usuario no es master
-      if (!user) {
-        router.push('/login')
-      } else if (userRole !== 'master') {
-        router.push('/')
-      }
-    }
-  }, [authLoading, user, userRole, router])
 
   // Cargar entrenamientos cuando cambie la fecha seleccionada
   useEffect(() => {
@@ -74,7 +52,7 @@ export default function WorkoutsPage() {
   )
 
   // Show loading while checking auth
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex items-center gap-2">
@@ -98,11 +76,6 @@ export default function WorkoutsPage() {
       }
       return newSet
     })
-  }
-
-  const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
   }
 
   return (
