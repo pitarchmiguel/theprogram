@@ -51,6 +51,13 @@ export default function WorkoutsPage() {
     workout && workout.date && isSameDay(new Date(workout.date), selectedDate)
   )
 
+  // Ordenar entrenamientos por la letra del primer bloque (A, B, C, ...)
+  const sortedWorkoutsForSelectedDate = [...workoutsForSelectedDate].sort((a, b) => {
+    const aLetter = a.blocks && a.blocks[0] && a.blocks[0].letter ? a.blocks[0].letter.toUpperCase() : '';
+    const bLetter = b.blocks && b.blocks[0] && b.blocks[0].letter ? b.blocks[0].letter.toUpperCase() : '';
+    return aLetter.localeCompare(bLetter, 'es');
+  });
+
   // Show loading while checking auth
   if (loading) {
     return (
@@ -175,7 +182,7 @@ export default function WorkoutsPage() {
               </div>
             </Card>
           ) : (
-            workoutsForSelectedDate.map((workout) => {
+            sortedWorkoutsForSelectedDate.map((workout) => {
               // Verificar que el workout y sus bloques sean válidos
               if (!workout || !workout.blocks) {
                 return null

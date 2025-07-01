@@ -5,12 +5,14 @@ import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
+// Crear el cliente una sola vez fuera del hook para evitar recreaciones
+const supabase = createClient()
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<'master' | 'athlete' | null>(null)
   const router = useRouter()
-  const supabase = createClient()
 
   console.log('🔧 useAuth hook initialized')
 
@@ -34,7 +36,7 @@ export function useAuth() {
       console.error('❌ Exception fetching profile:', error)
       return null
     }
-  }, [supabase])
+  }, []) // Remover dependencia de supabase
 
   useEffect(() => {
     let mounted = true
@@ -66,7 +68,18 @@ export function useAuth() {
 
         if (error) {
           console.error('❌ Session error:', error)
-          // Usar fallback
+          // Solo usar fallback si no hay sesión activa, no por errores de refresh token
+          if (error.message?.includes('Invalid Refresh Token') || error.message?.includes('Refresh Token Not Found')) {
+            console.log('ℹ️ No hay sesión activa (esperado si el usuario no ha iniciado sesión)')
+            if (mounted) {
+              setUser(null)
+              setUserRole(null)
+              setLoading(false)
+            }
+            return
+          }
+          
+          // Para otros errores, usar fallback
           const fallbackRole = getRoleFromStorage()
           if (mounted) {
             setUserRole(fallbackRole)
@@ -149,7 +162,7 @@ export function useAuth() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [getRoleFromProfile, supabase.auth])
+  }, []) // Remover getRoleFromProfile de las dependencias para evitar bucle infinito
 
   console.log('🔧 useAuth current state:', { user: user?.email, userRole, loading })
 
