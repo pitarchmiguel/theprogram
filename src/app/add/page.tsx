@@ -30,8 +30,11 @@ import {
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
-import { getWorkoutsByDateRange, deleteWorkout, createWorkout, type Workout, type Block } from '@/lib/supabase'
+import { getWorkoutsByDateRange, deleteWorkout, createWorkout, updateWorkout, type Workout, type Block } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { CategorySelector, CategoryBadge } from '@/components/category-selector'
+import { CategoryManager } from '@/components/category-manager'
+import { CategoryStatsDisplay } from '@/components/category-stats'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -50,7 +53,8 @@ function ManageWorkoutsContent() {
       letter: '',
       title: '',
       description: '',
-      notes: ''
+      notes: '',
+      category: undefined
     }
   ])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -174,7 +178,8 @@ function ManageWorkoutsContent() {
         letter: '',
         title: '',
         description: '',
-        notes: ''
+        notes: '',
+        category: undefined
       }])
       
       // Cerrar dialog en móvil
@@ -197,7 +202,7 @@ function ManageWorkoutsContent() {
     }
   }
 
-  const updateBlock = (id: string, field: keyof Block, value: string) => {
+  const updateBlock = (id: string, field: keyof Block, value: string | undefined) => {
     setBlocks(prev => prev.map(block => 
       block.id === id ? { ...block, [field]: value } : block
     ))
@@ -217,7 +222,8 @@ function ManageWorkoutsContent() {
       letter: '',
       title: '',
       description: '',
-      notes: ''
+      notes: '',
+      category: undefined
     }])
     setIsEditDialogOpen(true)
   }
@@ -244,15 +250,10 @@ function ManageWorkoutsContent() {
       setIsSubmitting(true)
       
       // Actualizar en Supabase
-      const dateStr = format(selectedDate, 'yyyy-MM-dd')
       console.log('Actualizando entrenamiento:', editingWorkout.id)
       console.log('Nuevos bloques:', validBlocks)
       
-      // Primero eliminar el entrenamiento existente
-      await deleteWorkout(editingWorkout.id)
-      
-      // Luego crear el nuevo entrenamiento
-      await createWorkout(dateStr, validBlocks)
+      await updateWorkout(editingWorkout.id, validBlocks)
       
       // Mostrar toast de éxito
       toast.success('¡Entrenamiento actualizado correctamente!', {
@@ -265,9 +266,17 @@ function ManageWorkoutsContent() {
       // Recargar entrenamientos de la semana
       loadWeekWorkouts()
       
-      // Cerrar dialog
+      // Cerrar dialog y resetear estado
       setIsEditDialogOpen(false)
       setEditingWorkout(null)
+      setBlocks([{
+        id: Date.now().toString(),
+        letter: '',
+        title: '',
+        description: '',
+        notes: '',
+        category: undefined
+      }])
       
     } catch (error: unknown) {
       console.error('Error updating workout:', error)
@@ -327,16 +336,19 @@ function ManageWorkoutsContent() {
                         <div key={block.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="font-bold text-primary text-sm">{block.letter}</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="truncate text-sm cursor-default">
-                                  {block.title.length > 20 ? `${block.title.substring(0, 20)}...` : block.title}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{block.title}</p>
-                              </TooltipContent>
-                            </Tooltip>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="truncate text-sm cursor-default">
+                                    {block.title.length > 20 ? `${block.title.substring(0, 20)}...` : block.title}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{block.title}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              {block.category && <CategoryBadge category={block.category} />}
+                            </div>
                           </div>
                           <div className="flex gap-1 flex-shrink-0">
                             <Button
@@ -429,7 +441,10 @@ function ManageWorkoutsContent() {
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <span className="font-bold text-primary text-lg">{block.letter}</span>
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm">{block.title}</h4>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-medium text-sm">{block.title}</h4>
+                                  {block.category && <CategoryBadge category={block.category} />}
+                                </div>
                                 {block.description && (
                                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                     {block.description}
@@ -559,6 +574,16 @@ function ManageWorkoutsContent() {
               </div>
             </div>
 
+            {/* Categoría */}
+            <CategorySelector
+              value={block.category}
+              onValueChange={(category) => updateBlock(block.id, 'category', category || '')}
+              disabled={isSubmitting}
+              placeholder="Seleccionar categoría (opcional)"
+              id={`category-${block.id}`}
+              label="Categoría"
+            />
+
             {/* Descripción */}
             <div className="space-y-1">
               <Label htmlFor={`description-${block.id}`} className="text-xs">Descripción</Label>
@@ -657,7 +682,11 @@ function ManageWorkoutsContent() {
             </div>
 
             {/* Panel de Formulario (30%) */}
-            <div className="w-80 space-y-4">
+            <div className="w-80 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">
+              {/* Estadísticas */}
+              <CategoryStatsDisplay className="w-full" />
+              
+              {/* Formulario de añadir entrenamiento */}
               <Card>
                 <CardContent className="p-4">
                   <h3 className="text-lg font-semibold mb-4">
@@ -677,6 +706,12 @@ function ManageWorkoutsContent() {
                   {renderForm()}
                 </CardContent>
               </Card>
+              
+              {/* Gestor de categorías */}
+              <CategoryManager onCategoriesChange={() => {
+                // Recargar entrenamientos cuando cambien las categorías
+                loadWeekWorkouts()
+              }} />
             </div>
           </div>
         )}

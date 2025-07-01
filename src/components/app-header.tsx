@@ -11,13 +11,14 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/useAuth'
-import { useState } from 'react'
+import { useState, ReactNode } from 'react'
 
 interface AppHeaderProps {
   title?: string
+  actions?: ReactNode
 }
 
-export function AppHeader({ title = "The Program" }: AppHeaderProps) {
+export function AppHeader({ title = "The Program", actions }: AppHeaderProps) {
   const router = useRouter()
   const { user, userRole, signOut } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
@@ -45,10 +46,16 @@ export function AppHeader({ title = "The Program" }: AppHeaderProps) {
         </div>
         <div className="flex items-center gap-3">
           {user && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-lg">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-muted rounded-lg">
               <span className="text-sm font-medium">
                 {user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario'}
               </span>
+            </div>
+          )}
+          {/* Elementos adicionales (como filtros) */}
+          {actions && (
+            <div className="flex items-center gap-2">
+              {actions}
             </div>
           )}
           {user && (

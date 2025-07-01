@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { CategoryBadge } from '@/components/category-selector'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -209,7 +210,7 @@ export default function Home() {
                         
                         return (
                           <div key={block.id} className="space-y-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-primary text-lg">{block.letter || '?'}</span>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -221,6 +222,7 @@ export default function Home() {
                                   <p>{block.title || 'Sin título'}</p>
                                 </TooltipContent>
                               </Tooltip>
+                              {block.category && <CategoryBadge category={block.category} />}
                             </div>
                             {block.description && (
                               <div className="text-sm text-muted-foreground whitespace-pre-wrap">
