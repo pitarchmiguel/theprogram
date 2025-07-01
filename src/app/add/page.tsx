@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle, LogOut, Dumbbell } from 'lucide-react'
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Edit, Trash2, X, AlertCircle, LogOut, Dumbbell, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -632,6 +632,15 @@ function ManageWorkoutsContent() {
               >
                 <Dumbbell className="h-4 w-4" />
                 Entrenamientos
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/admin/users')}
+                className="flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Admin
               </Button>
               <Button
                 variant="ghost"
