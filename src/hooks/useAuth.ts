@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { User } from '@supabase/supabase-js'
+import { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
@@ -131,7 +131,7 @@ export function useAuth() {
 
     // Suscripción a cambios de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         console.log('🔄 Auth change:', event, session ? 'with user' : 'no user')
         
         if (!mounted) return
@@ -162,7 +162,7 @@ export function useAuth() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, []) // Remover getRoleFromProfile de las dependencias para evitar bucle infinito
+  }, [getRoleFromProfile]) // Incluir getRoleFromProfile en las dependencias para satisfacer ESLint
 
   console.log('🔧 useAuth current state:', { user: user?.email, userRole, loading })
 

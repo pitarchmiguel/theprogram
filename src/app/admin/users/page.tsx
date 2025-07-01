@@ -31,6 +31,14 @@ interface Profile {
   full_name?: string;
 }
 
+interface SupabaseProfile {
+  id: string;
+  email: string;
+  role: string;
+  created_at?: string;
+  full_name?: string;
+}
+
 export default function AdminUsersPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [filteredProfiles, setFilteredProfiles] = useState<Profile[]>([]);
@@ -122,7 +130,7 @@ export default function AdminUsersPage() {
           }
           
           // Usar los datos simples
-          const enrichedProfiles = simpleData.map(profile => ({
+          const enrichedProfiles = simpleData.map((profile: SupabaseProfile) => ({
             id: profile.id,
             email: profile.email,
             role: profile.role,
@@ -164,7 +172,7 @@ export default function AdminUsersPage() {
         }
         
         // Enriquecer datos con información básica
-        const enrichedProfiles = profilesData.map(profile => ({
+        const enrichedProfiles = profilesData.map((profile: SupabaseProfile) => ({
           ...profile,
           last_sign_in_at: profile.created_at, // Usar created_at como aproximación
           full_name: profile.full_name || "Sin nombre"
@@ -350,7 +358,7 @@ export default function AdminUsersPage() {
                         
                         if (profilesError) throw profilesError;
                         
-                        const enrichedProfiles = profilesData?.map(profile => ({
+                        const enrichedProfiles = profilesData?.map((profile: SupabaseProfile) => ({
                           ...profile,
                           last_sign_in_at: profile.created_at,
                           full_name: profile.full_name || "Sin nombre"
