@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+
 import {
   BarChart3,
   TrendingUp,
@@ -14,7 +14,7 @@ import {
   Clock,
   Filter,
 } from 'lucide-react'
-import { format, subDays, subWeeks, subMonths, startOfWeek, endOfWeek } from 'date-fns'
+import { format, subWeeks, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { 
   getCategoryStats, 
@@ -77,11 +77,7 @@ export default function AnalyticsPage() {
     },
   ]
 
-  useEffect(() => {
-    loadAnalyticsData()
-  }, [filters])
-
-  const loadAnalyticsData = async () => {
+  const loadAnalyticsData = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -109,7 +105,11 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters])
+
+  useEffect(() => {
+    loadAnalyticsData()
+  }, [loadAnalyticsData])
 
   const setPeriod = (period: typeof PERIODS[0]) => {
     const range = period.getRange()

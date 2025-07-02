@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Trash2, Edit, Palette } from 'lucide-react'
+import { Plus, Trash2, Palette } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { 
-  DEFAULT_WORKOUT_CATEGORIES, 
   WORKOUT_CATEGORIES, 
   loadCustomCategories,
   createCustomCategory,

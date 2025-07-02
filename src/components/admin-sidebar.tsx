@@ -10,10 +10,9 @@ import {
   Tag,
   TrendingUp,
   LifeBuoy,
-  LogOut,
   ChevronLeft,
 } from "lucide-react"
-import { useRouter, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 
 import { NavMain } from "@/components/nav-main"
@@ -31,7 +30,6 @@ import {
 
 export function AdminSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, signOut } = useAuth()
-  const router = useRouter()
   const pathname = usePathname()
 
   const data = {

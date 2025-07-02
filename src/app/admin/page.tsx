@@ -13,7 +13,6 @@ import {
   Activity,
   Plus,
   ArrowRight,
-  Dumbbell,
   Tag,
 } from 'lucide-react'
 import Link from 'next/link'

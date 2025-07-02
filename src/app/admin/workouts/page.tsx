@@ -39,7 +39,7 @@ export const dynamic = 'force-dynamic'
 function ManageWorkoutsContent() {
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
-  const { user, userRole } = useAuth()
+  const { } = useAuth()
   
   const [selectedDate, setSelectedDate] = useState(dateParam ? new Date(dateParam) : new Date())
   const [currentWeek, setCurrentWeek] = useState(dateParam ? new Date(dateParam) : new Date())
