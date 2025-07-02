@@ -72,13 +72,13 @@ export function AppHeader({ title = "The Program", actions }: AppHeaderProps) {
               <DropdownMenuContent align="end">
                 {userRole === 'master' && (
                   <>
-                    <DropdownMenuItem onClick={() => router.push('/add')}>
+                    <DropdownMenuItem onClick={() => router.push('/admin')}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Panel de Administración
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/admin/workouts')}>
                       <Plus className="h-4 w-4 mr-2" />
                       Gestionar Entrenamientos
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/admin/users')}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Gestionar Usuarios
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>

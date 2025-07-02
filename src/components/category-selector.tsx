@@ -72,9 +72,10 @@ export function CategorySelector({
           <SelectValue placeholder={placeholder}>
             {selectedCategory && (
               <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${selectedCategory.color}`} />
-                <span className="text-sm font-medium">{selectedCategory.value}</span>
-                <span className="text-xs text-muted-foreground">({selectedCategory.label})</span>
+                <div className={`w-5 h-5 rounded-full ${selectedCategory.color} text-white text-xs font-bold flex items-center justify-center`}>
+                  {getCategoryInitial(selectedCategory.value)}
+                </div>
+                <span className="text-sm font-medium">{selectedCategory.label}</span>
               </div>
             )}
           </SelectValue>
@@ -86,9 +87,10 @@ export function CategorySelector({
           {categories.map((category) => (
             <SelectItem key={category.value} value={category.value}>
               <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${category.color}`} />
-                <span className="font-medium">{category.value}</span>
-                <span className="text-xs text-muted-foreground">({category.label})</span>
+                <div className={`w-5 h-5 rounded-full ${category.color} text-white text-xs font-bold flex items-center justify-center`}>
+                  {getCategoryInitial(category.value)}
+                </div>
+                <span className="font-medium">{category.label}</span>
                 {'isDefault' in category && !category.isDefault && (
                   <Badge variant="outline" className="text-xs px-1 py-0 h-4">
                     Custom
@@ -109,18 +111,39 @@ interface CategoryBadgeProps {
   size?: 'sm' | 'default'
 }
 
+// Función para obtener la inicial de una categoría
+function getCategoryInitial(category: string): string {
+  const categoryMap: Record<string, string> = {
+    'OLY': 'O',
+    'METCON': 'M', 
+    'STRENGTH': 'S',
+    'GYMNASTICS': 'G'
+  }
+  
+  // Si es una categoría conocida, usar el mapeo
+  if (categoryMap[category]) {
+    return categoryMap[category]
+  }
+  
+  // Para categorías personalizadas, usar la primera letra
+  return category.charAt(0).toUpperCase()
+}
+
 export function CategoryBadge({ category, size = 'sm' }: CategoryBadgeProps) {
   if (!category) return null
   
   const categoryInfo = WORKOUT_CATEGORIES.find(cat => cat.value === category)
   if (!categoryInfo) return null
 
+  const initial = getCategoryInitial(category)
+  const circleSize = size === 'sm' ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'
+
   return (
-    <Badge 
-      variant="secondary" 
-      className={`${categoryInfo.color} text-white font-medium ${size === 'sm' ? 'text-xs px-2 py-0' : ''}`}
+    <div 
+      className={`${circleSize} rounded-full ${categoryInfo.color} text-white font-bold flex items-center justify-center`}
+      title={`${category} (${categoryInfo.label})`}
     >
-      {category}
-    </Badge>
+      {initial}
+    </div>
   )
 } 

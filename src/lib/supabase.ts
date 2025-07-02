@@ -50,6 +50,7 @@ export type Block = {
 export type Workout = {
   id: string
   created_at: string
+  updated_at: string
   date: string
   blocks: Block[]
 }
@@ -177,7 +178,18 @@ export async function updateWorkout(id: string, blocks: Block[]) {
 
   if (error) {
     console.error('Error updating workout:', error)
-    throw error
+    // Proporcionar un mensaje de error más específico
+    if (error.code === '23505') {
+      throw new Error('Ya existe un entrenamiento para esta fecha')
+    } else if (error.code === '23502') {
+      throw new Error('Faltan campos requeridos')
+    } else if (error.code === '42P01') {
+      throw new Error('La tabla workouts no existe')
+    } else if (error.code === 'PGRST116') {
+      throw new Error('Entrenamiento no encontrado')
+    } else {
+      throw new Error(`Error al actualizar entrenamiento: ${error.message || 'Error desconocido'}`)
+    }
   }
 
   return data
@@ -192,7 +204,14 @@ export async function deleteWorkout(id: string) {
 
   if (error) {
     console.error('Error deleting workout:', error)
-    throw error
+    // Proporcionar un mensaje de error más específico
+    if (error.code === 'PGRST116') {
+      throw new Error('Entrenamiento no encontrado')
+    } else if (error.code === '42P01') {
+      throw new Error('La tabla workouts no existe')
+    } else {
+      throw new Error(`Error al eliminar entrenamiento: ${error.message || 'Error desconocido'}`)
+    }
   }
 }
 
@@ -450,4 +469,176 @@ export async function getWorkoutsWithFilters(options: {
   }
 
   return workouts
+}
+
+// Tipos para métricas del dashboard
+export type DashboardMetrics = {
+  totalWorkouts: number
+  totalUsers: number
+  workoutsThisWeek: number
+  workoutsThisMonth: number
+  activeUsersThisWeek: number
+  categoriesUsed: number
+  recentActivity: RecentActivity[]
+}
+
+export type RecentActivity = {
+  id: string
+  type: 'workout_created' | 'user_registered'
+  description: string
+  date: string
+  user?: string
+}
+
+export type UserStats = {
+  id: string
+  email: string
+  full_name?: string
+  role: string
+  created_at: string
+  last_workout?: string
+  total_workouts: number
+}
+
+// Función para obtener métricas del dashboard
+export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  try {
+    const now = new Date()
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1)
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    
+    // Total de entrenamientos
+    const { count: totalWorkouts } = await supabase
+      .from('workouts')
+      .select('*', { count: 'exact', head: true })
+
+    // Total de usuarios
+    const { count: totalUsers } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+
+    // Entrenamientos esta semana
+    const { count: workoutsThisWeek } = await supabase
+      .from('workouts')
+      .select('*', { count: 'exact', head: true })
+      .gte('date', weekStart.toISOString().split('T')[0])
+
+    // Entrenamientos este mes
+    const { count: workoutsThisMonth } = await supabase
+      .from('workouts')
+      .select('*', { count: 'exact', head: true })
+      .gte('date', monthStart.toISOString().split('T')[0])
+
+    // Categorías utilizadas
+    const categoriesUsed = await getUsedCategories()
+
+    // Actividad reciente
+    const recentActivity = await getRecentActivity()
+
+    return {
+      totalWorkouts: totalWorkouts || 0,
+      totalUsers: totalUsers || 0,
+      workoutsThisWeek: workoutsThisWeek || 0,
+      workoutsThisMonth: workoutsThisMonth || 0,
+      activeUsersThisWeek: 0, // Por implementar
+      categoriesUsed: categoriesUsed.length,
+      recentActivity
+    }
+  } catch (error) {
+    console.error('Error fetching dashboard metrics:', error)
+    return {
+      totalWorkouts: 0,
+      totalUsers: 0,
+      workoutsThisWeek: 0,
+      workoutsThisMonth: 0,
+      activeUsersThisWeek: 0,
+      categoriesUsed: 0,
+      recentActivity: []
+    }
+  }
+}
+
+// Función para obtener estadísticas de usuarios
+export async function getUserStats(): Promise<UserStats[]> {
+  try {
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    const userStats: UserStats[] = []
+    
+    for (const profile of profiles || []) {
+      // Obtener último entrenamiento y total de entrenamientos para cada usuario
+      // Nota: Esta es una implementación básica, se puede optimizar
+      const { data: workouts } = await supabase
+        .from('workouts')
+        .select('date, created_at')
+        .order('date', { ascending: false })
+        .limit(1)
+
+      userStats.push({
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name,
+        role: profile.role,
+        created_at: profile.created_at,
+        last_workout: workouts?.[0]?.date,
+        total_workouts: 0 // Por implementar con conteo específico por usuario si es necesario
+      })
+    }
+
+    return userStats
+  } catch (error) {
+    console.error('Error fetching user stats:', error)
+    return []
+  }
+}
+
+// Función para obtener actividad reciente
+export async function getRecentActivity(): Promise<RecentActivity[]> {
+  try {
+    const activities: RecentActivity[] = []
+
+    // Últimos entrenamientos creados
+    const { data: recentWorkouts } = await supabase
+      .from('workouts')
+      .select('id, date, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    recentWorkouts?.forEach(workout => {
+      activities.push({
+        id: workout.id,
+        type: 'workout_created',
+        description: `Entrenamiento programado para ${new Date(workout.date).toLocaleDateString('es-ES')}`,
+        date: workout.created_at
+      })
+    })
+
+    // Últimos usuarios registrados
+    const { data: recentUsers } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    recentUsers?.forEach(user => {
+      activities.push({
+        id: user.id,
+        type: 'user_registered',
+        description: `Nuevo usuario registrado: ${user.full_name || user.email}`,
+        date: user.created_at,
+        user: user.full_name || user.email
+      })
+    })
+
+    // Ordenar por fecha más reciente
+    return activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
+  } catch (error) {
+    console.error('Error fetching recent activity:', error)
+    return []
+  }
 } 
