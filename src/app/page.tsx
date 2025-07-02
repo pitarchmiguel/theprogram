@@ -4,16 +4,18 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, RefreshCw, CalendarDays } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { getWorkoutsByDate, type Workout } from '@/lib/supabase'
+import { getWorkoutsByDate, getWorkoutsWithFilters, type Workout } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { CategoryBadge } from '@/components/category-selector'
+import { AdvancedFilter, type AdvancedFilterOptions } from '@/components/advanced-filter'
+import { CategoryStatsDisplay } from '@/components/category-stats'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -27,6 +29,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
   const [isTimeout, setIsTimeout] = useState(false)
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterOptions>({
+    categories: []
+  })
   const { requireAuth, loading: authLoading, userRole } = useAuth()
 
   // Check authentication and redirect master users
@@ -40,7 +45,7 @@ export default function Home() {
     }
   }, [authLoading, requireAuth, userRole, router])
 
-  // Cargar entrenamientos cuando cambie la fecha seleccionada
+  // Cargar entrenamientos cuando cambien los filtros o la fecha seleccionada
   useEffect(() => {
     const loadWorkouts = async () => {
       try {
@@ -54,11 +59,21 @@ export default function Home() {
           setError('La carga está tardando más de lo normal. Verifica tu conexión a internet.')
         }, 15000)
         
-        const dateStr = format(selectedDate, 'yyyy-MM-dd')
-        const data = await getWorkoutsByDate(dateStr)
+        // Si hay filtros avanzados activos, usarlos
+        if (advancedFilters.categories.length > 0 || advancedFilters.startDate || advancedFilters.endDate) {
+          const data = await getWorkoutsWithFilters({
+            ...advancedFilters,
+            categories: advancedFilters.categories.length > 0 ? advancedFilters.categories : undefined
+          })
+          setWorkouts(data || [])
+        } else {
+          // Solo filtrar por fecha seleccionada
+          const dateStr = format(selectedDate, 'yyyy-MM-dd')
+          const data = await getWorkoutsByDate(dateStr)
+          setWorkouts(data || [])
+        }
         
         clearTimeout(timeoutId)
-        setWorkouts(data || [])
         
       } catch (error) {
         console.error('Error loading workouts:', error)
@@ -74,14 +89,30 @@ export default function Home() {
     if (!authLoading) {
       loadWorkouts()
     }
-  }, [selectedDate, authLoading])
+  }, [selectedDate, advancedFilters, authLoading])
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  const workoutsForSelectedDate = workouts.filter(workout => 
-    workout && workout.date && isSameDay(new Date(workout.date), selectedDate)
-  )
+  // Si hay filtros avanzados activos, usar todos los workouts filtrados
+  // Si no, filtrar solo por fecha seleccionada
+  const workoutsForSelectedDate = (advancedFilters.categories.length > 0 || advancedFilters.startDate || advancedFilters.endDate)
+    ? workouts
+    : workouts.filter(workout => 
+        workout && workout.date && isSameDay(new Date(workout.date), selectedDate)
+      )
+
+  // Ordenar entrenamientos por fecha (más reciente primero) y luego por letra del primer bloque
+  const sortedWorkoutsForSelectedDate = [...workoutsForSelectedDate].sort((a, b) => {
+    // Primero ordenar por fecha
+    const dateComparison = new Date(b.date).getTime() - new Date(a.date).getTime()
+    if (dateComparison !== 0) return dateComparison
+    
+    // Luego por letra del primer bloque
+    const aLetter = a.blocks && a.blocks[0] && a.blocks[0].letter ? a.blocks[0].letter.toUpperCase() : '';
+    const bLetter = b.blocks && b.blocks[0] && b.blocks[0].letter ? b.blocks[0].letter.toUpperCase() : '';
+    return aLetter.localeCompare(bLetter, 'es');
+  });
 
   const toggleNotes = (blockId: string) => {
     setVisibleNotes(prev => {
@@ -103,6 +134,20 @@ export default function Home() {
     setSelectedDate(new Date(selectedDate.getTime() + 1))
     setTimeout(() => setSelectedDate(currentDate), 100)
   }
+
+  const hasActiveFilters = advancedFilters.categories.length > 0 || advancedFilters.startDate || advancedFilters.endDate
+
+  // Filtro para el header
+  const headerActions = (
+    <div className="relative">
+      <AdvancedFilter
+        filters={advancedFilters}
+        onFiltersChange={setAdvancedFilters}
+        showStats={false}
+        compact={true}
+      />
+    </div>
+  )
 
   // Show enhanced loading while checking auth or loading data
   if (authLoading || loading) {
@@ -144,10 +189,19 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header with navigation */}
-      <AppHeader />
+      <AppHeader actions={headerActions} />
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-4 space-y-4 max-w-md mx-auto">
+      <main className="container mx-auto px-4 py-4 space-y-6 max-w-md mx-auto">
+        {/* Estadísticas cuando hay filtros activos */}
+        {hasActiveFilters && (
+          <CategoryStatsDisplay 
+            startDate={advancedFilters.startDate}
+            endDate={advancedFilters.endDate}
+            compact={true}
+          />
+        )}
+
         {/* Calendario Semanal */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -202,128 +256,153 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Filtros activos en vista móvil */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap gap-2">
+            {/* Filtro de fecha */}
+            {(advancedFilters.startDate || advancedFilters.endDate) && (
+              <Badge variant="outline" className="gap-1">
+                <CalendarDays className="h-3 w-3" />
+                {advancedFilters.startDate && advancedFilters.endDate 
+                  ? `${format(new Date(advancedFilters.startDate), 'dd/MM', { locale: es })} - ${format(new Date(advancedFilters.endDate), 'dd/MM', { locale: es })}`
+                  : advancedFilters.startDate 
+                    ? `Desde ${format(new Date(advancedFilters.startDate), 'dd/MM', { locale: es })}`
+                    : `Hasta ${format(new Date(advancedFilters.endDate!), 'dd/MM', { locale: es })}`
+                }
+              </Badge>
+            )}
+            
+            {/* Filtros de categoría */}
+            {advancedFilters.categories.map((category) => (
+              <CategoryBadge key={category} category={category} />
+            ))}
+          </div>
+        )}
+
         {/* Lista de Entrenamientos */}
         <div className="space-y-4">
-          <h3 className="text-base font-semibold">
-            {format(selectedDate, 'EEEE, d MMMM', { locale: es })}
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold">
+              {hasActiveFilters
+                ? "Entrenamientos filtrados"
+                : format(selectedDate, 'EEEE, d MMMM', { locale: es })
+              }
+            </h3>
+            {sortedWorkoutsForSelectedDate.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {sortedWorkoutsForSelectedDate.length} entrenamientos
+              </span>
+            )}
+          </div>
           
+          {/* Contenido de entrenamientos */}
           {error ? (
             <Card className="p-6 text-center border-destructive">
               <div className="text-destructive">
                 <XCircle className="h-12 w-12 mx-auto mb-4" />
-                <p className="mb-4">{error}</p>
-                <div className="flex gap-2 justify-center">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleRetry}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                    Reintentar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => router.push('/test-connection')}
-                  >
-                    Diagnóstico
-                  </Button>
-                </div>
+                <p>{error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRetry}
+                  className="mt-4"
+                >
+                  Reintentar
+                </Button>
               </div>
             </Card>
-          ) : loading ? (
-            <Card className="p-6 text-center">
-              <div className="text-muted-foreground">
-                <Dumbbell className="h-12 w-12 mx-auto mb-4 opacity-50 animate-pulse" />
-                <p>Cargando entrenamientos...</p>
-              </div>
-            </Card>
-          ) : workoutsForSelectedDate.length === 0 ? (
+          ) : sortedWorkoutsForSelectedDate.length === 0 ? (
             <Card className="p-6 text-center">
               <div className="text-muted-foreground">
                 <Dumbbell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No hay entrenamientos programados para este día</p>
+                <p>
+                  {hasActiveFilters
+                    ? "No se encontraron entrenamientos con los filtros seleccionados"
+                    : "No hay entrenamientos programados para este día"
+                  }
+                </p>
               </div>
             </Card>
           ) : (
-            workoutsForSelectedDate.map((workout) => {
-              // Verificar que el workout y sus bloques sean válidos
-              if (!workout || !workout.blocks) {
-                return null
-              }
+            <div className="space-y-4">
+              {sortedWorkoutsForSelectedDate.map((workout) => {
+                // Verificar que el workout y sus bloques sean válidos
+                if (!workout || !workout.blocks) {
+                  return null
+                }
 
-              const blocks = Array.isArray(workout.blocks) ? workout.blocks : []
-              
-              return (
-                <Card key={workout.id} className="overflow-hidden">
-                  <CardContent className="space-y-24 pt-2">
-                    {blocks.length > 0 ? (
-                      blocks.map((block) => {
-                        if (!block || !block.id) return null
-                        
-                        const isNotesVisible = visibleNotes.has(block.id)
-                        
-                        return (
-                          <div key={block.id} className="space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-primary text-lg">{block.letter || '?'}</span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="font-medium text-sm cursor-default">
-                                    {block.title && block.title.length > 25 ? `${block.title.substring(0, 25)}...` : (block.title || 'Sin título')}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{block.title || 'Sin título'}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              {block.category && <CategoryBadge category={block.category} />}
-                            </div>
-                            {block.description && (
-                              <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {block.description}
+                const blocks = Array.isArray(workout.blocks) ? workout.blocks : []
+                
+                return (
+                  <Card key={workout.id} className="overflow-hidden">
+                    <CardContent className="space-y-4 pt-4">
+                      {blocks.length > 0 ? (
+                        blocks.map((block) => {
+                          if (!block || !block.id) return null
+                          
+                          const isNotesVisible = visibleNotes.has(block.id)
+                          
+                          return (
+                            <div key={block.id} className="space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-primary text-lg">{block.letter || '?'}</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="font-medium text-sm cursor-default">
+                                      {block.title && block.title.length > 25 ? `${block.title.substring(0, 25)}...` : (block.title || 'Sin título')}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{block.title || 'Sin título'}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                {block.category && <CategoryBadge category={block.category} />}
                               </div>
-                            )}
-                            {block.notes && block.notes.trim() && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleNotes(block.id)}
-                                  className="h-6 text-xs hover:bg-transparent p-0"
-                                >
-                                  {isNotesVisible ? (
-                                    <>
-                                      Ocultar notas
-                                      <EyeOff className="h-3 w-3 ml-1" />
-                                    </>
-                                  ) : (
-                                    <>
-                                      Ver notas
-                                      <Eye className="h-3 w-3 ml-1" />
-                                    </>
+                              {block.description && (
+                                <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                  {block.description}
+                                </div>
+                              )}
+                              {block.notes && block.notes.trim() && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleNotes(block.id)}
+                                    className="h-6 text-xs hover:bg-transparent p-0"
+                                  >
+                                    {isNotesVisible ? (
+                                      <>
+                                        Ocultar notas
+                                        <EyeOff className="h-3 w-3 ml-1" />
+                                      </>
+                                    ) : (
+                                      <>
+                                        Ver notas
+                                        <Eye className="h-3 w-3 ml-1" />
+                                      </>
+                                    )}
+                                  </Button>
+                                  {isNotesVisible && (
+                                    <div className="text-xs text-muted-foreground italic bg-muted p-2 rounded whitespace-pre-wrap">
+                                      {block.notes}
+                                    </div>
                                   )}
-                                </Button>
-                                {isNotesVisible && (
-                                  <div className="text-xs text-muted-foreground italic bg-muted p-2 rounded whitespace-pre-wrap">
-                                    {block.notes}
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        No hay bloques definidos para este entrenamiento
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            }).filter(Boolean)
+                                </>
+                              )}
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          No hay bloques definidos para este entrenamiento
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              }).filter(Boolean)}
+            </div>
           )}
         </div>
       </main>

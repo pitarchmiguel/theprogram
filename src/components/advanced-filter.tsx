@@ -130,7 +130,7 @@ export function AdvancedFilter({ filters, onFiltersChange, showStats = true, cla
   }
 
   return (
-    <div className={className}>
+    <div className={`${className} ${compact ? 'relative' : ''}`}>
       {/* Estadísticas cuando hay filtros activos */}
       {showStats && hasActiveFilters && !compact && (
         <CategoryStatsDisplay 
@@ -179,7 +179,7 @@ export function AdvancedFilter({ filters, onFiltersChange, showStats = true, cla
 
       {/* Panel de filtros expandible */}
       {isExpanded && (
-        <Card className={`mt-2 ${compact ? 'absolute right-0 top-full z-50 w-80' : ''}`}>
+        <Card className={`mt-2 ${compact ? 'fixed inset-x-4 top-20 z-50 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:w-80 sm:inset-x-auto' : ''}`}>
           <CardContent className="p-4 space-y-4">
             
             {/* Filtros de fecha */}
