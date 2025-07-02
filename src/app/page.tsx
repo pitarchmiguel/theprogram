@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, RefreshCw } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleNotes, setVisibleNotes] = useState<Set<string>>(new Set())
+  const [isTimeout, setIsTimeout] = useState(false)
   const { requireAuth, loading: authLoading, userRole } = useAuth()
 
   // Check authentication and redirect master users
@@ -45,20 +46,35 @@ export default function Home() {
       try {
         setLoading(true)
         setError(null)
+        setIsTimeout(false)
+        
+        // Timeout visual de 15 segundos
+        const timeoutId = setTimeout(() => {
+          setIsTimeout(true)
+          setError('La carga está tardando más de lo normal. Verifica tu conexión a internet.')
+        }, 15000)
+        
         const dateStr = format(selectedDate, 'yyyy-MM-dd')
         const data = await getWorkoutsByDate(dateStr)
+        
+        clearTimeout(timeoutId)
         setWorkouts(data || [])
+        
       } catch (error) {
         console.error('Error loading workouts:', error)
-        setError('Error al cargar los entrenamientos')
+        const errorMessage = error instanceof Error ? error.message : 'Error al cargar los entrenamientos'
+        setError(errorMessage)
         setWorkouts([])
       } finally {
         setLoading(false)
+        setIsTimeout(false)
       }
     }
 
-    loadWorkouts()
-  }, [selectedDate])
+    if (!authLoading) {
+      loadWorkouts()
+    }
+  }, [selectedDate, authLoading])
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -66,21 +82,6 @@ export default function Home() {
   const workoutsForSelectedDate = workouts.filter(workout => 
     workout && workout.date && isSameDay(new Date(workout.date), selectedDate)
   )
-
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-          <span>Cargando...</span>
-        </div>
-      </div>
-    )
-  }
-
-  const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
-  const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
 
   const toggleNotes = (blockId: string) => {
     setVisibleNotes(prev => {
@@ -93,6 +94,52 @@ export default function Home() {
       return newSet
     })
   }
+
+  const handleRetry = () => {
+    setError(null)
+    setIsTimeout(false)
+    // Trigger reload by changing selectedDate slightly then back
+    const currentDate = selectedDate
+    setSelectedDate(new Date(selectedDate.getTime() + 1))
+    setTimeout(() => setSelectedDate(currentDate), 100)
+  }
+
+  // Show enhanced loading while checking auth or loading data
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span>{authLoading ? 'Verificando usuario...' : 'Cargando entrenamientos...'}</span>
+          {isTimeout && (
+            <div className="text-center text-sm text-muted-foreground max-w-xs">
+              <p>La carga está tardando más de lo normal.</p>
+              <div className="flex gap-2 mt-2 justify-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Reintentar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => router.push('/test-connection')}
+                >
+                  Diagnóstico
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
+  const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,15 +212,24 @@ export default function Home() {
             <Card className="p-6 text-center border-destructive">
               <div className="text-destructive">
                 <XCircle className="h-12 w-12 mx-auto mb-4" />
-                <p>{error}</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => window.location.reload()}
-                  className="mt-4"
-                >
-                  Reintentar
-                </Button>
+                <p className="mb-4">{error}</p>
+                <div className="flex gap-2 justify-center">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleRetry}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Reintentar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => router.push('/test-connection')}
+                  >
+                    Diagnóstico
+                  </Button>
+                </div>
               </div>
             </Card>
           ) : loading ? (

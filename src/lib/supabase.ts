@@ -56,43 +56,51 @@ export type Workout = {
 
 // Función para obtener entrenamientos por fecha
 export async function getWorkoutsByDate(date: string) {
-  const { data, error } = await supabase
-    .from('workouts')
-    .select('*')
-    .eq('date', date)
-    .order('created_at', { ascending: true })
+  try {
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('*')
+      .eq('date', date)
+      .order('created_at', { ascending: true })
 
-  if (error) {
-    console.error('Error fetching workouts:', error)
+    if (error) {
+      console.error('Error fetching workouts:', error)
+      throw error
+    }
+
+    return (data || []).map(workout => ({
+      ...workout,
+      blocks: workout.blocks || []
+    }))
+  } catch (error) {
+    console.error('Error in getWorkoutsByDate:', error)
     throw error
   }
-
-  // Asegurar que cada workout tenga blocks como array
-  return (data || []).map(workout => ({
-    ...workout,
-    blocks: workout.blocks || []
-  }))
 }
 
 // Función para obtener entrenamientos por rango de fechas
 export async function getWorkoutsByDateRange(startDate: string, endDate: string) {
-  const { data, error } = await supabase
-    .from('workouts')
-    .select('*')
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: true })
+  try {
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true })
 
-  if (error) {
-    console.error('Error fetching workouts:', error)
+    if (error) {
+      console.error('Error fetching workouts:', error)
+      throw error
+    }
+
+    return (data || []).map(workout => ({
+      ...workout,
+      blocks: workout.blocks || []
+    }))
+  } catch (error) {
+    console.error('Error in getWorkoutsByDateRange:', error)
     throw error
   }
-
-  // Asegurar que cada workout tenga blocks como array
-  return (data || []).map(workout => ({
-    ...workout,
-    blocks: workout.blocks || []
-  }))
 }
 
 // Función para crear un nuevo entrenamiento
