@@ -245,7 +245,7 @@ export async function getWorkoutsByCategory(category: WorkoutCategory, startDate
     return blocks.some((block: Block) => block.category === category)
   })
 
-  return filteredWorkouts.map(workout => ({
+  return filteredWorkouts.map((workout: any) => ({
     ...workout,
     blocks: workout.blocks || []
   }))
@@ -264,7 +264,7 @@ export async function getUsedCategories(): Promise<WorkoutCategory[]> {
 
   const categoriesSet = new Set<WorkoutCategory>()
   
-  data?.forEach(workout => {
+  data?.forEach((workout: any) => {
     const blocks = workout.blocks || []
     blocks.forEach((block: Block) => {
       if (block.category) {
@@ -299,7 +299,7 @@ export async function getCategoryStats(startDate?: string, endDate?: string): Pr
 
   const categoryCount = new Map<WorkoutCategory, number>()
   
-  data?.forEach(workout => {
+  data?.forEach((workout: any) => {
     const blocks = workout.blocks || []
     const categoriesInWorkout = new Set<WorkoutCategory>()
     
@@ -348,7 +348,7 @@ export async function loadCustomCategories(): Promise<void> {
       return
     }
 
-    const customCategories: CustomCategory[] = (data || []).map(cat => ({
+    const customCategories: CustomCategory[] = (data || []).map((cat: any) => ({
       ...cat,
       isDefault: false
     }))
@@ -455,14 +455,14 @@ export async function getWorkoutsWithFilters(options: {
     throw error
   }
 
-  let workouts = (data || []).map(workout => ({
+  let workouts = (data || []).map((workout: any) => ({
     ...workout,
     blocks: workout.blocks || []
   }))
 
   // Filtrar por categorías si se especifican
   if (options.categories && options.categories.length > 0) {
-    workouts = workouts.filter(workout => {
+    workouts = workouts.filter((workout: any) => {
       const blocks = workout.blocks || []
       return blocks.some((block: Block) => 
         block.category && options.categories!.includes(block.category)
@@ -611,7 +611,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .order('created_at', { ascending: false })
       .limit(5)
 
-    recentWorkouts?.forEach(workout => {
+    recentWorkouts?.forEach((workout: any) => {
       activities.push({
         id: workout.id,
         type: 'workout_created',
@@ -627,7 +627,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .order('created_at', { ascending: false })
       .limit(5)
 
-    recentUsers?.forEach(user => {
+    recentUsers?.forEach((user: any) => {
       activities.push({
         id: user.id,
         type: 'user_registered',
