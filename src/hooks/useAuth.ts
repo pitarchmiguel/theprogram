@@ -55,9 +55,9 @@ export function useAuth() {
       profileCache.set(userId, { role, timestamp: Date.now() })
       
       return role
-         } catch (error: any) {
+         } catch (error: unknown) {
        clearTimeout(timeoutId)
-       if (error.name === 'AbortError') {
+       if (error instanceof Error && error.name === 'AbortError') {
          console.error('Profile fetch timed out')
        } else {
          console.error('Failed to fetch user profile:', error)
@@ -68,11 +68,14 @@ export function useAuth() {
   }, [])
 
   // Función para manejar errores con retry logic
-  const handleAuthError = useCallback((error: any, context: string) => {
+  const handleAuthError = useCallback((error: unknown, context: string) => {
     console.error(`Auth error in ${context}:`, error)
     
+    const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    
     // Solo incrementar retry count para errores de red
-    if (error.code === 'NETWORK_ERROR' || error.message?.includes('network')) {
+    if (errorCode === 'NETWORK_ERROR' || errorMessage?.includes('network')) {
       retryCount.current++
       if (retryCount.current < maxRetries) {
         setError(`Problemas de conexión. Reintentando... (${retryCount.current}/${maxRetries})`)
@@ -300,8 +303,8 @@ export function useAuth() {
       }
       
       return true
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.error('Session validation timed out')
       } else {
         console.error('Session validation failed:', error)

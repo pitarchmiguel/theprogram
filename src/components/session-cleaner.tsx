@@ -41,10 +41,10 @@ export function SessionCleaner() {
             // Validate the current session with timeout
             const authResult = await Promise.race([
               validateAuthSession(),
-              new Promise((_, reject) => 
+              new Promise<never>((_, reject) => 
                 setTimeout(() => reject(new Error('Session validation timeout')), 10000)
               )
-            ]) as any
+            ])
 
             clearTimeout(timeoutId)
             
@@ -70,14 +70,17 @@ export function SessionCleaner() {
             } else {
               console.log('✅ Sesión válida - no se requiere limpieza')
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             clearTimeout(timeoutId)
             console.error('Error durante validación de sesión:', error)
             
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null
+            
             // Solo limpiar en caso de timeout o errores críticos
-            if (error.message === 'Session validation timeout' || 
-                error.message?.includes('network') ||
-                error.code === 'NETWORK_ERROR') {
+            if (errorMessage === 'Session validation timeout' || 
+                errorMessage?.includes('network') ||
+                errorCode === 'NETWORK_ERROR') {
               console.log('🧹 Error de red - limpiando datos por seguridad...')
               await clearAllSessions()
               lastCleanupRef.current = now
