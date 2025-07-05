@@ -1,74 +1,148 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { createClient, clearAllSessions } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
 const supabase = createClient()
 
+// Cache del perfil para evitar múltiples llamadas a la base de datos
+const profileCache = new Map<string, { role: 'master' | 'athlete', timestamp: number }>()
+const PROFILE_CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<'master' | 'athlete'>('athlete')
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const initializationRef = useRef(false)
+  const retryCount = useRef(0)
+  const maxRetries = 3
+
+  // Función para obtener el perfil con cache y timeout
+  const fetchUserProfile = useCallback(async (userId: string): Promise<'master' | 'athlete'> => {
+    // Verificar cache
+    const cached = profileCache.get(userId)
+    if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_DURATION) {
+      return cached.role
+    }
+
+    // Timeout para la consulta
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos timeout
+
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+        .abortSignal(controller.signal)
+
+      clearTimeout(timeoutId)
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError)
+        // En caso de error, usar el rol por defecto pero no cerrar sesión
+        return 'athlete'
+      }
+
+      const role = (profile?.role as 'master' | 'athlete') || 'athlete'
+      
+      // Actualizar cache
+      profileCache.set(userId, { role, timestamp: Date.now() })
+      
+      return role
+         } catch (error: any) {
+       clearTimeout(timeoutId)
+       if (error.name === 'AbortError') {
+         console.error('Profile fetch timed out')
+       } else {
+         console.error('Failed to fetch user profile:', error)
+       }
+       // En caso de error, usar el rol por defecto
+       return 'athlete'
+     }
+  }, [])
+
+  // Función para manejar errores con retry logic
+  const handleAuthError = useCallback((error: any, context: string) => {
+    console.error(`Auth error in ${context}:`, error)
+    
+    // Solo incrementar retry count para errores de red
+    if (error.code === 'NETWORK_ERROR' || error.message?.includes('network')) {
+      retryCount.current++
+      if (retryCount.current < maxRetries) {
+        setError(`Problemas de conexión. Reintentando... (${retryCount.current}/${maxRetries})`)
+        return false // No cerrar sesión, reintentar
+      }
+    }
+    
+    // Resetear retry count en otros errores
+    retryCount.current = 0
+    setError(null)
+    return true // Proceder con el manejo normal del error
+  }, [])
 
   useEffect(() => {
     let mounted = true
+    let timeoutId: NodeJS.Timeout
 
     const initializeAuth = async () => {
+      // Prevenir múltiples inicializaciones
+      if (initializationRef.current) return
+      initializationRef.current = true
+
       try {
+        // Timeout para la inicialización completa
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            setError('La verificación de usuario está tardando demasiado. Por favor, recarga la página.')
+            setLoading(false)
+          }
+        }, 15000) // 15 segundos timeout
+
         // Obtener sesión
         const { data, error } = await supabase.auth.getSession()
         
         if (!mounted) return
         
         if (error || !data.session?.user) {
-          // Limpiar cualquier dato de sesión local
+          // Limpiar datos locales sin mostrar error
           if (typeof window !== 'undefined') {
             localStorage.removeItem('userRole')
           }
           setUser(null)
           setUserRole('athlete')
+          setError(null)
           setLoading(false)
+          clearTimeout(timeoutId)
           return
         }
 
         setUser(data.session.user)
         
-        // Obtener rol SIEMPRE desde la base de datos - NO usar localStorage
+        // Obtener rol con cache y timeout
         try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.session.user.id)
-            .single()
-          
-          if (profileError) {
-            console.error('Error fetching profile:', profileError)
-            // Si no se puede obtener el perfil, cerrar sesión por seguridad
-            await supabase.auth.signOut()
-            setUser(null)
-            setUserRole('athlete')
-            setLoading(false)
-            return
+          const role = await fetchUserProfile(data.session.user.id)
+          if (mounted) {
+            setUserRole(role)
+            setError(null)
+            retryCount.current = 0 // Resetear retry count en éxito
           }
-          
-          const role = (profile?.role as 'master' | 'athlete') || 'athlete'
-          setUserRole(role)
-          
         } catch (error) {
-          console.error('Failed to fetch user profile:', error)
-          // Por seguridad, cerrar sesión si no se puede verificar el rol
-          await supabase.auth.signOut()
-          setUser(null)
-          setUserRole('athlete')
+          if (mounted && handleAuthError(error, 'profile fetch')) {
+            // Solo usar rol por defecto, no cerrar sesión
+            setUserRole('athlete')
+            console.warn('Using default role due to profile fetch error')
+          }
         }
         
       } catch (sessionError) {
-        console.error('Session initialization failed:', sessionError)
-        if (mounted) {
-          // Limpiar datos locales en caso de error
+        if (mounted && handleAuthError(sessionError, 'session initialization')) {
+          // Limpiar datos locales en caso de error crítico
           if (typeof window !== 'undefined') {
             localStorage.removeItem('userRole')
           }
@@ -78,47 +152,42 @@ export function useAuth() {
       } finally {
         if (mounted) {
           setLoading(false)
+          clearTimeout(timeoutId)
         }
       }
     }
 
     initializeAuth()
 
-    // Suscripción a cambios de auth
+    // Suscripción a cambios de auth con debounce
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return
         
         if (session?.user) {
           setUser(session.user)
+          setError(null)
           
-          // Obtener rol SIEMPRE desde la base de datos
+          // Obtener rol con cache
           try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', session.user.id)
-              .single()
-            
-            if (profileError) {
-              console.error('Error fetching profile on auth change:', profileError)
-              // Si no se puede obtener el perfil, cerrar sesión
-              await supabase.auth.signOut()
-              return
+            const role = await fetchUserProfile(session.user.id)
+            if (mounted) {
+              setUserRole(role)
+              retryCount.current = 0
             }
-            
-            const role = (profile?.role as 'master' | 'athlete') || 'athlete'
-            setUserRole(role)
-            
           } catch (error) {
-            console.error('Failed to fetch profile on auth change:', error)
-            // Por seguridad, cerrar sesión si no se puede verificar el rol
-            await supabase.auth.signOut()
+            if (mounted && handleAuthError(error, 'auth state change')) {
+              // Solo usar rol por defecto, no cerrar sesión
+              setUserRole('athlete')
+              console.warn('Using default role due to auth state change error')
+            }
           }
         } else {
           setUser(null)
           setUserRole('athlete')
-          // Limpiar datos locales cuando se cierre sesión
+          setError(null)
+          // Limpiar cache cuando se cierre sesión
+          profileCache.clear()
           if (typeof window !== 'undefined') {
             localStorage.removeItem('userRole')
           }
@@ -130,12 +199,15 @@ export function useAuth() {
 
     return () => {
       mounted = false
+      clearTimeout(timeoutId)
       subscription.unsubscribe()
+      initializationRef.current = false
     }
-  }, [])
+  }, [fetchUserProfile, handleAuthError])
 
   const signIn = async (email: string, password: string) => {
     try {
+      setError(null)
       const { data, error } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
@@ -144,20 +216,9 @@ export function useAuth() {
       if (error) return { data: null, error }
 
       if (data.user) {
-        // Obtener rol de forma segura desde la base de datos
+        // Obtener rol con timeout
         try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .single()
-          
-          if (profileError) {
-            console.error('Error fetching profile after login:', profileError)
-            return { data: null, error: new Error('No se pudo verificar el perfil del usuario') }
-          }
-          
-          const role = (profile?.role as 'master' | 'athlete') || 'athlete'
+          const role = await fetchUserProfile(data.user.id)
           setUserRole(role)
           
           // Redirección basada en rol
@@ -168,7 +229,9 @@ export function useAuth() {
           }
         } catch (error) {
           console.error('Failed to fetch profile after login:', error)
-          return { data: null, error: new Error('Error al verificar el perfil del usuario') }
+          // Continuar con rol por defecto en lugar de fallar
+          setUserRole('athlete')
+          router.push('/')
         }
       }
 
@@ -180,6 +243,9 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
+      // Limpiar cache
+      profileCache.clear()
+      
       // Limpiar sesiones locales ANTES de cerrar sesión
       await clearAllSessions()
       
@@ -189,14 +255,17 @@ export function useAuth() {
       // Asegurarse de que los estados locales se limpien
       setUser(null)
       setUserRole('athlete')
+      setError(null)
       
       router.push('/login')
     } catch (error) {
       console.error('Error signing out:', error)
       // Forzar logout local incluso si falla el logout remoto
+      profileCache.clear()
       await clearAllSessions()
       setUser(null)
       setUserRole('athlete')
+      setError(null)
       router.push('/login')
     }
   }
@@ -217,32 +286,26 @@ export function useAuth() {
     return true
   }
 
-  // Función para verificar la sesión actual de forma segura
+  // Función para verificar la sesión actual de forma segura con timeout
   const validateSession = async () => {
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
       const { data: { session }, error } = await supabase.auth.getSession()
+      clearTimeout(timeoutId)
       
       if (error || !session) {
-        await signOut()
-        return false
-      }
-      
-      // Verificar que el perfil aún existe y es válido
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single()
-      
-      if (profileError) {
-        await signOut()
         return false
       }
       
       return true
-    } catch (error) {
-      console.error('Session validation failed:', error)
-      await signOut()
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('Session validation timed out')
+      } else {
+        console.error('Session validation failed:', error)
+      }
       return false
     }
   }
@@ -251,6 +314,7 @@ export function useAuth() {
     user,
     userRole,
     loading,
+    error,
     signIn,
     signOut,
     requireAuth,

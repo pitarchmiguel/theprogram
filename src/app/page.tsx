@@ -32,7 +32,7 @@ export default function Home() {
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterOptions>({
     categories: []
   })
-  const { requireAuth, loading: authLoading, userRole } = useAuth()
+  const { requireAuth, loading: authLoading, userRole, error: authError } = useAuth()
 
   // Check authentication and redirect master users
   useEffect(() => {
@@ -44,6 +44,17 @@ export default function Home() {
       }
     }
   }, [authLoading, requireAuth, userRole, router])
+
+  // Timeout para carga de autenticación
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (authLoading) {
+        setIsTimeout(true)
+      }
+    }, 15000) // 15 segundos timeout
+
+    return () => clearTimeout(timeoutId)
+  }, [authLoading])
 
   // Cargar entrenamientos cuando cambien los filtros o la fecha seleccionada
   useEffect(() => {
@@ -155,8 +166,15 @@ export default function Home() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <span>{authLoading ? 'Verificando usuario...' : 'Cargando entrenamientos...'}</span>
-          {isTimeout && (
+          <span>
+            {authLoading ? 'Verificando usuario...' : 'Cargando entrenamientos...'}
+          </span>
+          {authError && (
+            <div className="text-center text-sm text-red-500 max-w-xs">
+              <p>{authError}</p>
+            </div>
+          )}
+          {(isTimeout || authError) && (
             <div className="text-center text-sm text-muted-foreground max-w-xs">
               <p>La carga está tardando más de lo normal.</p>
               <div className="flex gap-2 mt-2 justify-center">

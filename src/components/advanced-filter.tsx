@@ -179,7 +179,7 @@ export function AdvancedFilter({ filters, onFiltersChange, showStats = true, cla
 
       {/* Panel de filtros expandible */}
       {isExpanded && (
-        <Card className={`mt-2 ${compact ? 'fixed inset-x-4 top-20 z-50 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:w-80 sm:inset-x-auto' : ''}`}>
+        <Card className={`mt-2 ${compact ? 'fixed inset-x-4 top-20 z-50 sm:absolute sm:top-full sm:right-0 sm:w-80 sm:translate-x-[calc(-100%-0.5rem)]' : ''}`}>
           <CardContent className="p-4 space-y-4">
             
             {/* Filtros de fecha */}

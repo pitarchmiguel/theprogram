@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, Dumbbell, Loader2 } from 'lucide-react'
+import { AlertCircle, Dumbbell, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { createClient } from '@/lib/supabaseClient'
@@ -17,8 +17,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn, loading: authLoading } = useAuth()
+  const [isTimeout, setIsTimeout] = useState(false)
+  const { signIn, loading: authLoading, error: authError } = useAuth()
   const supabase = createClient()
+
+  // Timeout para carga de autenticación
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (authLoading) {
+        setIsTimeout(true)
+      }
+    }, 15000) // 15 segundos timeout
+
+    return () => clearTimeout(timeoutId)
+  }, [authLoading])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,9 +99,29 @@ export default function LoginPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Verificando sesión...</span>
+          {authError && (
+            <div className="text-center text-sm text-red-500 max-w-xs">
+              <p>{authError}</p>
+            </div>
+          )}
+          {(isTimeout || authError) && (
+            <div className="text-center text-sm text-muted-foreground max-w-xs">
+              <p>La verificación está tardando más de lo normal.</p>
+              <div className="flex gap-2 mt-2 justify-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Reintentar
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
