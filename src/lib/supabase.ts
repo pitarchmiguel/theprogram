@@ -1,9 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
+/* eslint-disable */
+import { createClient } from './supabaseClient'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Usar el cliente unificado para evitar múltiples instancias de GoTrue
+const supabase = createClient()
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Exportar el cliente para mantener compatibilidad
+export { supabase }
 
 // Categorías predefinidas del sistema (no se pueden eliminar)
 export const DEFAULT_WORKOUT_CATEGORIES = [
@@ -69,9 +71,9 @@ export async function getWorkoutsByDate(date: string) {
       throw error
     }
 
-    return (data || []).map(workout => ({
-      ...workout,
-      blocks: workout.blocks || []
+    return (data || []).map((workout: unknown) => ({
+      ...(workout as Workout),
+      blocks: (workout as Workout).blocks || []
     }))
   } catch (error) {
     console.error('Error in getWorkoutsByDate:', error)
@@ -94,9 +96,9 @@ export async function getWorkoutsByDateRange(startDate: string, endDate: string)
       throw error
     }
 
-    return (data || []).map(workout => ({
-      ...workout,
-      blocks: workout.blocks || []
+    return (data || []).map((workout: unknown) => ({
+      ...(workout as Workout),
+      blocks: (workout as Workout).blocks || []
     }))
   } catch (error) {
     console.error('Error in getWorkoutsByDateRange:', error)
@@ -238,7 +240,7 @@ export async function getWorkoutsByCategory(category: WorkoutCategory, startDate
   }
 
   // Filtrar workouts que tengan al menos un bloque con la categoría especificada
-  const filteredWorkouts = (data || []).filter(workout => {
+  const filteredWorkouts = (data || []).filter((workout: any) => {
     const blocks = workout.blocks || []
     return blocks.some((block: Block) => block.category === category)
   })

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from 'sonner'
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Analytics } from "@vercel/analytics/next"
+import { SessionCleaner } from "@/components/session-cleaner"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${inter.variable} font-sans antialiased`}>
+        <SessionCleaner />
         <TooltipProvider>
           {children}
         </TooltipProvider>

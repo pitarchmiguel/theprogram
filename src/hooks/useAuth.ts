@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabaseClient'
+import { createClient, clearAllSessions } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
 const supabase = createClient()
@@ -24,6 +24,10 @@ export function useAuth() {
         if (!mounted) return
         
         if (error || !data.session?.user) {
+          // Limpiar cualquier dato de sesión local
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('userRole')
+          }
           setUser(null)
           setUserRole('athlete')
           setLoading(false)
@@ -32,32 +36,42 @@ export function useAuth() {
 
         setUser(data.session.user)
         
-        // Obtener rol
+        // Obtener rol SIEMPRE desde la base de datos - NO usar localStorage
         try {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', data.session.user.id)
             .single()
           
+          if (profileError) {
+            console.error('Error fetching profile:', profileError)
+            // Si no se puede obtener el perfil, cerrar sesión por seguridad
+            await supabase.auth.signOut()
+            setUser(null)
+            setUserRole('athlete')
+            setLoading(false)
+            return
+          }
+          
           const role = (profile?.role as 'master' | 'athlete') || 'athlete'
           setUserRole(role)
           
-          // Guardar en localStorage para futuras cargas
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('userRole', role)
-          }
-          
-        } catch {
-          // Si falla obtener el perfil, usar localStorage o fallback
-          const storedRole = (typeof window !== 'undefined' ? localStorage.getItem('userRole') : null) as 'master' | 'athlete' || 'athlete'
-          setUserRole(storedRole)
-          console.log('Profile fetch failed, using stored role:', storedRole)
+        } catch (error) {
+          console.error('Failed to fetch user profile:', error)
+          // Por seguridad, cerrar sesión si no se puede verificar el rol
+          await supabase.auth.signOut()
+          setUser(null)
+          setUserRole('athlete')
         }
         
       } catch (sessionError) {
-        console.log('Session initialization failed:', sessionError instanceof Error ? sessionError.message : 'Unknown error')
+        console.error('Session initialization failed:', sessionError)
         if (mounted) {
+          // Limpiar datos locales en caso de error
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('userRole')
+          }
           setUser(null)
           setUserRole('athlete')
         }
@@ -78,27 +92,33 @@ export function useAuth() {
         if (session?.user) {
           setUser(session.user)
           
-          // Obtener rol de forma no-bloqueante
+          // Obtener rol SIEMPRE desde la base de datos
           try {
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
               .from('profiles')
               .select('role')
               .eq('id', session.user.id)
               .single()
             
+            if (profileError) {
+              console.error('Error fetching profile on auth change:', profileError)
+              // Si no se puede obtener el perfil, cerrar sesión
+              await supabase.auth.signOut()
+              return
+            }
+            
             const role = (profile?.role as 'master' | 'athlete') || 'athlete'
             setUserRole(role)
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('userRole', role)
-            }
-          } catch {
-            // Si falla, mantener rol actual o usar fallback
-            const storedRole = (typeof window !== 'undefined' ? localStorage.getItem('userRole') : null) as 'master' | 'athlete' || 'athlete'
-            setUserRole(storedRole)
+            
+          } catch (error) {
+            console.error('Failed to fetch profile on auth change:', error)
+            // Por seguridad, cerrar sesión si no se puede verificar el rol
+            await supabase.auth.signOut()
           }
         } else {
           setUser(null)
           setUserRole('athlete')
+          // Limpiar datos locales cuando se cierre sesión
           if (typeof window !== 'undefined') {
             localStorage.removeItem('userRole')
           }
@@ -124,19 +144,21 @@ export function useAuth() {
       if (error) return { data: null, error }
 
       if (data.user) {
-        // Obtener rol de forma rápida
+        // Obtener rol de forma segura desde la base de datos
         try {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', data.user.id)
             .single()
           
+          if (profileError) {
+            console.error('Error fetching profile after login:', profileError)
+            return { data: null, error: new Error('No se pudo verificar el perfil del usuario') }
+          }
+          
           const role = (profile?.role as 'master' | 'athlete') || 'athlete'
           setUserRole(role)
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('userRole', role)
-          }
           
           // Redirección basada en rol
           if (role === 'master') {
@@ -144,10 +166,9 @@ export function useAuth() {
           } else {
             router.push('/')
           }
-        } catch {
-          // Si falla obtener perfil, asumir athlete y continuar
-          setUserRole('athlete')
-          router.push('/')
+        } catch (error) {
+          console.error('Failed to fetch profile after login:', error)
+          return { data: null, error: new Error('Error al verificar el perfil del usuario') }
         }
       }
 
@@ -159,17 +180,23 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
+      // Limpiar sesiones locales ANTES de cerrar sesión
+      await clearAllSessions()
+      
+      // Cerrar sesión en Supabase
       await supabase.auth.signOut()
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('userRole')
-      }
+      
+      // Asegurarse de que los estados locales se limpien
+      setUser(null)
+      setUserRole('athlete')
+      
       router.push('/login')
     } catch (error) {
       console.error('Error signing out:', error)
-      // Forzar logout local
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('userRole')
-      }
+      // Forzar logout local incluso si falla el logout remoto
+      await clearAllSessions()
+      setUser(null)
+      setUserRole('athlete')
       router.push('/login')
     }
   }
@@ -190,6 +217,36 @@ export function useAuth() {
     return true
   }
 
+  // Función para verificar la sesión actual de forma segura
+  const validateSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error || !session) {
+        await signOut()
+        return false
+      }
+      
+      // Verificar que el perfil aún existe y es válido
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+      
+      if (profileError) {
+        await signOut()
+        return false
+      }
+      
+      return true
+    } catch (error) {
+      console.error('Session validation failed:', error)
+      await signOut()
+      return false
+    }
+  }
+
   return {
     user,
     userRole,
@@ -197,5 +254,6 @@ export function useAuth() {
     signIn,
     signOut,
     requireAuth,
+    validateSession,
   }
 } 
