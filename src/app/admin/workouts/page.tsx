@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { getWorkoutsByDateRange, deleteWorkout, createWorkout, updateWorkout, type Workout, type Block } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { CategorySelector, CategoryBadge } from '@/components/category-selector'
+import { Spinner } from '@/components/ui/spinner'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -606,7 +607,7 @@ function ManageWorkoutsContent() {
         <Button type="submit" disabled={isSubmitting} className="flex-1">
           {isSubmitting ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <Spinner size="sm" color="white" className="mr-2" />
               {isEditDialogOpen ? 'Actualizando...' : 'Guardando...'}
             </>
           ) : (
@@ -779,7 +780,7 @@ export default function ManageWorkoutsPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <Spinner size="lg" />
       </div>
     }>
       <ManageWorkoutsContent />

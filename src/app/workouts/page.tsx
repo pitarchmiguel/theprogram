@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, Dumbbell, CalendarDays } from 'lucide-react'
@@ -14,11 +15,15 @@ import { AppHeader } from '@/components/app-header'
 import { CategoryBadge } from '@/components/category-selector'
 import { AdvancedFilter, type AdvancedFilterOptions } from '@/components/advanced-filter'
 import { CategoryStatsDisplay } from '@/components/category-stats'
+import { Spinner } from '@/components/ui/spinner'
+import { useAuth } from '@/hooks/useAuth'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
 export default function WorkoutsPage() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentWeek, setCurrentWeek] = useState(new Date())
@@ -29,8 +34,17 @@ export default function WorkoutsPage() {
     categories: []
   })
 
+  // Verificar autenticación
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
   // Cargar entrenamientos cuando cambien los filtros o la fecha seleccionada
   useEffect(() => {
+    if (authLoading || !user) return
+
     const loadWorkouts = async () => {
       try {
         setLoading(true)
@@ -59,7 +73,24 @@ export default function WorkoutsPage() {
     }
 
     loadWorkouts()
-  }, [selectedDate, advancedFilters])
+  }, [selectedDate, advancedFilters, user, authLoading])
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Spinner />
+          <span>Verificando autenticación...</span>
+        </div>
+      </div>
+    )
+  }
+
+  // If no user, show nothing (redirect will happen)
+  if (!user) {
+    return null
+  }
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -89,7 +120,7 @@ export default function WorkoutsPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <Spinner />
           <span>Cargando...</span>
         </div>
       </div>
@@ -248,7 +279,7 @@ export default function WorkoutsPage() {
                 </Button>
               </div>
             </Card>
-          ) : workoutsForSelectedDate.length === 0 ? (
+          ) : sortedWorkoutsForSelectedDate.length === 0 ? (
             <Card className="p-6 text-center">
               <div className="text-muted-foreground">
                 <Dumbbell className="h-12 w-12 mx-auto mb-4 opacity-50" />

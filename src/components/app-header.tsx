@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/useAuth'
 import { useState, ReactNode } from 'react'
+import { Spinner } from '@/components/ui/spinner'
 
 interface AppHeaderProps {
   title?: string
@@ -89,7 +90,10 @@ export function AppHeader({ title = "The Program", actions }: AppHeaderProps) {
                   disabled={signingOut}
                 >
                   {signingOut ? (
-                    <span className="flex items-center"><span className="animate-spin mr-2 h-4 w-4 border-b-2 border-destructive rounded-full"></span>Cerrando...</span>
+                    <span className="flex items-center">
+                      <Spinner size="sm" color="destructive" className="mr-2" />
+                      Cerrando...
+                    </span>
                   ) : (
                     <><LogOut className="h-4 w-4 mr-2" />Cerrar Sesión</>
                   )}

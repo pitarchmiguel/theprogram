@@ -9,6 +9,7 @@ import { AlertCircle, Dumbbell, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { Spinner } from '@/components/ui/spinner'
 
 export default function LoginPage() {
   const [isLoginMode, setIsLoginMode] = useState(true)
@@ -99,7 +100,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-6 w-6 animate-spin" />
+          <Spinner />
           <span>Verificando sesión...</span>
           {authError && (
             <div className="text-center text-sm text-red-500 max-w-xs">
@@ -202,7 +203,7 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Spinner size="sm" className="mr-2" />
                   {isLoginMode ? 'Iniciando sesión...' : 'Registrando...'}
                 </>
               ) : (

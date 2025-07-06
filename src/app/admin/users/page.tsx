@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Search, Trash2, User, Calendar, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
 
 
 interface Profile {
@@ -302,7 +303,7 @@ export default function AdminUsersPage() {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
         <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <Spinner />
           <span>Cargando usuarios...</span>
         </div>
       </div>

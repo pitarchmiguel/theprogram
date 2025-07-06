@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { Spinner } from '@/components/ui/spinner'
 
 export default function AdminLayout({
   children,
@@ -47,7 +48,7 @@ export default function AdminLayout({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <Spinner size="xl" />
           <span>Verificando permisos de administrador...</span>
           {authError && (
             <div className="text-center text-sm text-red-500 max-w-xs">

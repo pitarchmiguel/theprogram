@@ -33,6 +33,7 @@ import {
   deleteCustomCategory,
   type CustomCategory 
 } from '@/lib/supabase'
+import { Spinner } from '@/components/ui/spinner'
 
 const COLOR_OPTIONS = [
   { label: 'Azul', value: 'bg-blue-500' },
@@ -219,7 +220,7 @@ export default function CategoriesPage() {
                 <Button type="submit" disabled={isSubmitting} className="flex-1">
                   {isSubmitting ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <Spinner size="sm" color="white" className="mr-2" />
                       Creando...
                     </>
                   ) : (
