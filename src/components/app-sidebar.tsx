@@ -4,13 +4,11 @@ import * as React from "react"
 import {
   BookOpen,
   Calendar,
-  Command,
   Dumbbell,
   Home,
   LifeBuoy,
   Settings,
   User,
-  Users,
 } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 

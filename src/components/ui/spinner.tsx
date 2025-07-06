@@ -13,12 +13,6 @@ const sizeClasses = {
   xl: 'h-12 w-12'
 }
 
-const colorClasses = {
-  primary: 'border-primary',
-  white: 'border-white',
-  destructive: 'border-destructive'
-}
-
 export function Spinner({ size = 'md', color = 'primary', className }: SpinnerProps) {
   const borderColor = color === 'primary' ? 'border-b-black' : 
                      color === 'white' ? 'border-b-white' :

@@ -89,7 +89,7 @@ export default function AdminUsersPage() {
       setUserRole(profile.role);
     };
     fetchUserRole();
-  }, [router, supabase]);
+  }, [router]);
 
   // Fetch all profiles
   useEffect(() => {
@@ -199,7 +199,7 @@ export default function AdminUsersPage() {
       }
     };
     fetchProfiles();
-  }, [userRole, supabase]);
+  }, [userRole]);
 
   // Filter profiles based on search term
   useEffect(() => {

@@ -89,7 +89,6 @@ export function useAuth() {
   useEffect(() => {
     let mounted = true
     let timeoutId: NodeJS.Timeout
-    let initDelay: NodeJS.Timeout
 
     const initializeAuth = async () => {
       console.log('🚀 [useAuth] Iniciando initializeAuth...')
@@ -118,7 +117,7 @@ export function useAuth() {
                   setUserRole(role)
                   setError(null)
                 }
-              } catch (error) {
+              } catch {
                 if (mounted) {
                   setUserRole('athlete')
                   console.warn('⚠️ [useAuth] Usando rol por defecto en inicialización global')
@@ -269,7 +268,7 @@ export function useAuth() {
     console.log('🎬 [useAuth] useEffect ejecutándose...')
     
     // Delay inicial para evitar problemas de hidratación
-    initDelay = setTimeout(() => {
+    const initDelayTimeout = setTimeout(() => {
       if (mounted) {
         initializeAuth()
       }
@@ -321,7 +320,7 @@ export function useAuth() {
       console.log('🧹 [useAuth] Cleanup: desmontando useAuth')
       mounted = false
       clearTimeout(timeoutId)
-      clearTimeout(initDelay)
+      clearTimeout(initDelayTimeout)
       subscription.unsubscribe()
       initializationRef.current = false
       
