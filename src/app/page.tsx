@@ -186,13 +186,6 @@ export default function Home() {
                   <RefreshCw className="h-4 w-4 mr-1" />
                   Reintentar
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => router.push('/test-connection')}
-                >
-                  Diagnóstico
-                </Button>
               </div>
             </div>
           )}

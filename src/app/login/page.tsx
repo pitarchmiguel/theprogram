@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle, Dumbbell, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
-import { createClient } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const [isLoginMode, setIsLoginMode] = useState(true)
@@ -19,7 +19,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [isTimeout, setIsTimeout] = useState(false)
   const { signIn, loading: authLoading, error: authError } = useAuth()
-  const supabase = createClient()
 
   // Timeout para carga de autenticación
   useEffect(() => {

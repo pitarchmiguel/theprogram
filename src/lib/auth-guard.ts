@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 
 export type AuthGuardResult = {
@@ -12,8 +12,6 @@ export type AuthGuardResult = {
  * Validates the current session and returns authentication status
  */
 export async function validateAuthSession(): Promise<AuthGuardResult> {
-  const supabase = createClient()
-  
   try {
     // Check session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -112,7 +110,6 @@ export async function requireAuth(requiredRole?: 'master'): Promise<AuthGuardRes
   
   if (!authResult.isAuthenticated) {
     // Force logout and redirect to login
-    const supabase = createClient()
     await supabase.auth.signOut()
     
     if (typeof window !== 'undefined') {
@@ -148,8 +145,6 @@ export async function validateApiAuth(request: Request): Promise<AuthGuardResult
       error: 'Missing token'
     }
   }
-  
-  const supabase = createClient()
   
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token)

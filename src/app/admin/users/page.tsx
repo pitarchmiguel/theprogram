@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,7 +51,6 @@ export default function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<Profile | null>(null);
   const [roleChangeUser, setRoleChangeUser] = useState<{ user: Profile; newRole: string } | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   // Fetch current user and check role
   useEffect(() => {

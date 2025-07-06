@@ -5,12 +5,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { createClient } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabase'
 
 export default function TestConnectionPage() {
   const [results, setResults] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const runTests = async () => {
     setLoading(true)
@@ -32,10 +31,9 @@ export default function TestConnectionPage() {
 
     // Test 2: Verificar si existe la tabla profiles
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('count(*)')
-        .limit(1)
+        .select('*', { count: 'exact', head: true })
       
       if (error) {
         testResults.profilesTable = {
@@ -43,12 +41,21 @@ export default function TestConnectionPage() {
           error: `Error: ${error.message} (Code: ${error.code})`,
           recommendation: error.code === '42P01' ? 
             'La tabla "profiles" no existe. Necesitas ejecutar el SQL de setup.' :
-            'Hay un problema con la tabla profiles.'
+            error.code === 'PGRST116' ?
+            'No tienes permisos para acceder a la tabla profiles. Revisa las políticas RLS.' :
+            'Hay un problema con la tabla profiles.',
+          details: {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          }
         }
       } else {
         testResults.profilesTable = {
           success: true,
-          message: 'La tabla profiles existe y es accesible'
+          message: 'La tabla profiles existe y es accesible',
+          count: data?.length || 0
         }
       }
     } catch (error) {
@@ -81,7 +88,33 @@ export default function TestConnectionPage() {
       }
     }
 
-    // Test 4: Variables de entorno
+    // Test 4: Verificar si tu usuario tiene perfil
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      
+      if (user.user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id, email, role, created_at')
+          .eq('id', user.user.id)
+          .single()
+        
+        testResults.userProfile = {
+          success: !error,
+          data: profile,
+          error: error,
+          userId: user.user.id,
+          userEmail: user.user.email
+        }
+      }
+    } catch (error) {
+      testResults.userProfile = {
+        success: false,
+        error: error
+      }
+    }
+
+    // Test 5: Variables de entorno
     testResults.environment = {
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configurada' : '❌ Falta',
       supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Configurada' : '❌ Falta'
@@ -157,6 +190,26 @@ export default function TestConnectionPage() {
               </Card>
             )}
 
+            {/* User Profile */}
+            {results.userProfile && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className={`text-sm ${results.userProfile.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {results.userProfile.success ? '✅' : '❌'} Tu Perfil de Usuario
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm mb-2">
+                    <p><strong>Email:</strong> {results.userProfile.userEmail}</p>
+                    <p><strong>ID:</strong> {results.userProfile.userId}</p>
+                  </div>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">
+                    {JSON.stringify(results.userProfile, null, 2)}
+                  </pre>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Environment */}
             <Card>
               <CardHeader>
@@ -178,24 +231,52 @@ export default function TestConnectionPage() {
                 {!results.profilesTable.success && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded">
                     <p className="font-semibold text-red-800">🚨 Problema Principal:</p>
-                    <p>La tabla "profiles" no existe. Necesitas ejecutar el SQL de setup en Supabase.</p>
-                    <p className="mt-2">
-                      <strong>Solución:</strong> Ejecuta el archivo <code>scripts/setup-database.sql</code> en el SQL Editor de Supabase.
-                    </p>
+                    <p>{results.profilesTable.recommendation}</p>
+                    {results.profilesTable.details && (
+                      <div className="mt-2 text-xs">
+                        <p><strong>Código:</strong> {results.profilesTable.details.code}</p>
+                        <p><strong>Mensaje:</strong> {results.profilesTable.details.message}</p>
+                        {results.profilesTable.details.hint && (
+                          <p><strong>Sugerencia:</strong> {results.profilesTable.details.hint}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 
-                {results.profilesTable.success && results.profilesData.count === 0 && (
+                {results.profilesTable.success && results.userProfile && !results.userProfile.success && (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-                    <p className="font-semibold text-yellow-800">⚠️ La tabla existe pero está vacía:</p>
-                    <p>Los usuarios se crearán automáticamente cuando se registren.</p>
+                    <p className="font-semibold text-yellow-800">⚠️ Tu usuario no tiene perfil:</p>
+                    <p>La tabla existe pero tu usuario no tiene un registro en profiles.</p>
+                    <p className="mt-2">
+                      <strong>Solución:</strong> Ejecuta este SQL en Supabase:
+                    </p>
+                    <code className="block mt-1 p-2 bg-gray-100 rounded text-xs">
+                      INSERT INTO public.profiles (id, email, role) VALUES ('{results.userProfile.userId}', '{results.userProfile.userEmail}', 'athlete');
+                    </code>
                   </div>
                 )}
                 
-                {results.profilesTable.success && results.profilesData.count > 0 && (
+                {results.profilesTable.success && results.userProfile?.success && results.userProfile.data?.role !== 'master' && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="font-semibold text-blue-800">ℹ️ Eres un atleta:</p>
+                    <p>Tu perfil existe pero tienes rol de atleta.</p>
+                    <p className="mt-2">
+                      <strong>Para ser master:</strong> Ejecuta este SQL en Supabase:
+                    </p>
+                    <code className="block mt-1 p-2 bg-gray-100 rounded text-xs">
+                      SELECT public.create_master_user('{results.userProfile.userEmail}');
+                    </code>
+                  </div>
+                )}
+                
+                {results.profilesTable.success && results.userProfile?.success && results.userProfile.data?.role === 'master' && (
                   <div className="p-3 bg-green-50 border border-green-200 rounded">
-                    <p className="font-semibold text-green-800">✅ Todo está funcionando correctamente</p>
-                    <p>La tabla profiles existe y tiene datos. El error debe ser temporal.</p>
+                    <p className="font-semibold text-green-800">✅ Todo perfecto</p>
+                    <p>Tu perfil existe y tienes rol de master. El problema debe ser temporal.</p>
+                    <p className="mt-2">
+                      <strong>Solución:</strong> Intenta cerrar sesión y volver a iniciar sesión.
+                    </p>
                   </div>
                 )}
               </CardContent>

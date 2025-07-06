@@ -85,8 +85,9 @@ export async function clearAllSessions() {
 // Función para forzar logout completo
 export async function forceLogout() {
   try {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    // Usar el cliente singleton en lugar de crear uno nuevo
+    const supabaseClient = createClient()
+    await supabaseClient.auth.signOut()
   } catch (error) {
     console.error('Error during signOut:', error)
   } finally {

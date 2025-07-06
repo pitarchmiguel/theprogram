@@ -1,10 +1,10 @@
 /* eslint-disable */
 import { createClient } from './supabaseClient'
 
-// Usar el cliente unificado para evitar múltiples instancias de GoTrue
+// Usar el cliente singleton - solo se crea una instancia
 const supabase = createClient()
 
-// Exportar el cliente para mantener compatibilidad
+// Exportar el cliente singleton
 export { supabase }
 
 // Categorías predefinidas del sistema (no se pueden eliminar)

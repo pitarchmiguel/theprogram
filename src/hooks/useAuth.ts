@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
-import { createClient, clearAllSessions } from '@/lib/supabaseClient'
+import { clearAllSessions } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-
-const supabase = createClient()
 
 // Cache del perfil para evitar múltiples llamadas a la base de datos
 const profileCache = new Map<string, { role: 'master' | 'athlete', timestamp: number }>()
