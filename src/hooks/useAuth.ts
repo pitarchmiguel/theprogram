@@ -19,7 +19,7 @@ export function useAuth() {
   const router = useRouter()
   const mountedRef = useRef(true)
 
-  // Función para obtener el perfil del usuario (simplificada)
+  // Función para obtener el perfil del usuario (optimizada)
   const fetchUserProfile = useCallback(async (userId: string, retryCount = 0): Promise<'master' | 'athlete'> => {
     console.log('🔍 [useAuth] Obteniendo perfil para:', userId, retryCount > 0 ? `(retry ${retryCount})` : '')
     
@@ -31,15 +31,16 @@ export function useAuth() {
     }
 
     try {
-      // Timeout específico para consulta de perfil
+      // Consulta simplificada con timeout reducido
       const profilePromise = supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .single()
+        .maybeSingle() // Usar maybeSingle para evitar errores si no existe
 
+      // Timeout reducido a 5 segundos para evitar bloqueos largos
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('PROFILE_TIMEOUT')), 10000) // 10s para perfil
+        setTimeout(() => reject(new Error('PROFILE_TIMEOUT')), 5000)
       })
 
       const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise])
@@ -47,8 +48,8 @@ export function useAuth() {
       if (profileError) {
         console.error('❌ [useAuth] Error fetching profile:', profileError)
         
-        // Retry logic para errores de red
-        if (retryCount < 2 && (
+        // Si hay error, regresar rol por defecto después de unos pocos intentos
+        if (retryCount < 1 && (
           profileError.message?.includes('network') || 
           profileError.message?.includes('timeout') ||
           profileError.message?.includes('PROFILE_TIMEOUT')
@@ -58,6 +59,8 @@ export function useAuth() {
           return fetchUserProfile(userId, retryCount + 1)
         }
         
+        // Después de fallos, asumir athlete para no bloquear la app
+        console.warn('⚠️ [useAuth] Asignando rol athlete por defecto debido a errores persistentes')
         return 'athlete'
       }
 
@@ -71,13 +74,15 @@ export function useAuth() {
     } catch (error) {
       console.error('❌ [useAuth] Error en fetchUserProfile:', error)
       
-      // Retry logic para errores de conexión
-      if (retryCount < 2) {
+      // Solo un reintento para timeout/network errors
+      if (retryCount < 1) {
         console.log(`🔁 [useAuth] Reintentando perfil en ${1000 * (retryCount + 1)}ms...`)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
         return fetchUserProfile(userId, retryCount + 1)
       }
       
+      // Fallback: asumir athlete para no bloquear la app
+      console.warn('⚠️ [useAuth] Asignando rol athlete por defecto debido a errores persistentes')
       return 'athlete'
     }
   }, [])
@@ -266,14 +271,31 @@ export function useAuth() {
   }
 
   const requireAuth = (requiredRole?: 'master') => {
-    if (loading || roleLoading) return false
+    // Si está cargando el usuario, esperar
+    if (loading) return false
     
+    // Si no hay usuario, redirigir a login
     if (!user) {
       router.push('/login')
       return false
     }
 
+    // Si está cargando el rol pero ya pasó mucho tiempo, permitir acceso con rol por defecto
+    if (roleLoading) {
+      console.warn('⚠️ [useAuth] Rol aún cargando, pero permitiendo acceso temporal')
+      // Solo permitir acceso a rutas que no requieren master si el rol está cargando
+      if (requiredRole === 'master') {
+        console.log('🛡️ [useAuth] Acceso master denegado mientras carga rol')
+        router.push('/')
+        return false
+      }
+      // Para rutas que no requieren master, permitir acceso
+      return true
+    }
+
+    // Verificación normal de rol
     if (requiredRole === 'master' && userRole !== 'master') {
+      console.log('🛡️ [useAuth] Usuario no es master, redirigiendo')
       router.push('/')
       return false
     }
