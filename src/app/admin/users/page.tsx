@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +23,6 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Trash2, User, Calendar, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
-
 
 interface Profile {
   id: string;
@@ -47,71 +45,18 @@ export default function AdminUsersPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [filteredProfiles, setFilteredProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [userToDelete, setUserToDelete] = useState<Profile | null>(null);
   const [roleChangeUser, setRoleChangeUser] = useState<{ user: Profile; newRole: string } | null>(null);
-  const router = useRouter();
 
-  // Fetch current user and check role
+  // Fetch all profiles - AdminLayout ya verifica que somos master
   useEffect(() => {
-    const fetchUserRole = async () => {
-      console.log("🔍 Iniciando verificación de rol...");
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("👤 Usuario actual:", user);
-      
-      if (!user) {
-        console.log("❌ No hay usuario, redirigiendo a /");
-        router.replace("/");
-        return;
-      }
-      
-      console.log("🔍 Buscando perfil para usuario:", user.id);
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      
-      console.log("📋 Perfil encontrado:", profile);
-      console.log("❌ Error si existe:", error);
-      
-      if (!profile || profile.role !== "master") {
-        console.log("❌ No es master o no hay perfil, redirigiendo a /");
-        console.log("   - Profile existe:", !!profile);
-        console.log("   - Role:", profile?.role);
-        router.replace("/");
-        return;
-      }
-      
-      console.log("✅ Usuario es master, permitiendo acceso");
-      setUserRole(profile.role);
-    };
-    fetchUserRole();
-  }, [router]);
-
-  // Fetch all profiles
-  useEffect(() => {
-    if (userRole !== "master") return;
     const fetchProfiles = async () => {
-      // Limpiar datos anteriores
-      setProfiles([]);
-      setFilteredProfiles([]);
       setLoading(true);
       console.log("🔍 Iniciando fetch de perfiles...");
       
       try {
-        // Verificar que el usuario actual es master
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log("👤 Usuario actual para fetch:", user);
-        
-        if (!user) {
-          console.error("No hay usuario autenticado");
-          return;
-        }
-        
-        // Obtener perfiles
+        // Obtener perfiles directamente, sin verificaciones adicionales
         console.log("📋 Intentando obtener perfiles...");
         
         const { data: profilesData, error: profilesError } = await supabase
@@ -150,20 +95,9 @@ export default function AdminUsersPage() {
         
         console.log("📊 Datos de perfiles:", profilesData);
         console.log("📊 Número de perfiles:", profilesData?.length);
-        if (profilesData && profilesData.length > 0) {
-          console.log("📅 Primer perfil created_at:", profilesData[0].created_at);
-          console.log("📅 Segundo perfil created_at:", profilesData[1]?.created_at);
-        }
-        console.log("❌ Error de perfiles:", profilesError);
         
         if (profilesError) {
           console.error("Error fetching profiles:", profilesError);
-          console.error("Error details:", {
-            message: (profilesError as Error).message,
-            details: (profilesError as { details?: string }).details,
-            hint: (profilesError as { hint?: string }).hint,
-            code: (profilesError as { code?: string }).code
-          });
           throw profilesError;
         }
         
@@ -182,15 +116,10 @@ export default function AdminUsersPage() {
         }));
         
         console.log("✅ Profiles loaded:", enrichedProfiles);
-        console.log("📅 Sample created_at:", enrichedProfiles[0]?.created_at);
         setProfiles(enrichedProfiles);
         setFilteredProfiles(enrichedProfiles);
       } catch (error) {
         console.error("❌ Error fetching profiles:", error);
-        console.error("Error type:", typeof error);
-        if (error && typeof error === 'object') {
-          console.error("Error keys:", Object.keys(error));
-        }
         toast.error("Error al cargar usuarios");
         setProfiles([]);
         setFilteredProfiles([]);
@@ -198,8 +127,9 @@ export default function AdminUsersPage() {
         setLoading(false);
       }
     };
+    
     fetchProfiles();
-  }, [userRole]);
+  }, []); // Sin dependencias, se ejecuta una sola vez
 
   // Filter profiles based on search term
   useEffect(() => {

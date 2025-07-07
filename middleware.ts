@@ -56,12 +56,17 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Permitir acceso a rutas públicas
-  const publicRoutes = ['/login', '/api/auth', '/']
+  // Permitir acceso a rutas públicas y archivos estáticos
+  const publicRoutes = ['/login', '/api/auth']
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
-
+  
   // Permitir acceso a archivos estáticos
   if (pathname.startsWith('/_next/') || pathname.startsWith('/favicon.ico')) {
+    return response
+  }
+
+  // Permitir acceso a la página principal (será manejada por useAuth)
+  if (pathname === '/') {
     return response
   }
 
@@ -71,41 +76,29 @@ export async function middleware(request: NextRequest) {
 
     // Si no hay sesión válida y la ruta no es pública, redirigir a login
     if ((!session || error) && !isPublicRoute) {
+      console.log('🛡️ [Middleware] Sin sesión, redirigiendo a login:', pathname)
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirectTo', pathname)
       return NextResponse.redirect(loginUrl)
     }
 
-    // Si hay sesión, verificar permisos para rutas administrativas
-    if (session && pathname.startsWith('/admin')) {
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-
-        if (profileError || !profile || profile.role !== 'master') {
-          // Redirigir a página principal si no es master
-          return NextResponse.redirect(new URL('/workouts', request.url))
-        }
-      } catch (error) {
-        console.error('Error verifying admin access:', error)
-        // En caso de error, redirigir por seguridad
-        return NextResponse.redirect(new URL('/login', request.url))
-      }
-    }
-
-    // Si el usuario tiene sesión pero accede a login, redirigir a dashboard
+    // ✅ CAMBIO CRÍTICO: Eliminadas verificaciones de rol admin
+    // Dejar que useAuth + AdminLayout manejen la autorización de roles
+    // Esto elimina los conflictos de redirección
+    
+    // Si el usuario tiene sesión pero accede a login, redirigir a página principal
     if (session && pathname === '/login') {
-      return NextResponse.redirect(new URL('/workouts', request.url))
+      console.log('🛡️ [Middleware] Usuario autenticado en /login, redirigiendo a home')
+      return NextResponse.redirect(new URL('/', request.url))
     }
+
+    console.log('🛡️ [Middleware] Permitiendo acceso a:', pathname)
 
     return response
   } catch (error) {
-    console.error('Middleware error:', error)
+    console.error('❌ [Middleware] Error:', error)
     // En caso de error, permitir acceso a rutas públicas pero redirigir otras a login
-    if (!isPublicRoute) {
+    if (!isPublicRoute && pathname !== '/') {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     return response

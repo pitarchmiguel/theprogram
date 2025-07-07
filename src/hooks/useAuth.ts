@@ -13,6 +13,7 @@ const PROFILE_CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [roleLoading, setRoleLoading] = useState(false)
   const [userRole, setUserRole] = useState<'master' | 'athlete'>('athlete')
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -85,91 +86,62 @@ export function useAuth() {
     console.log('🔧 [useAuth] Montando hook...')
     mountedRef.current = true
 
-         // Función inline para obtener perfil
-     const getProfile = async (userId: string): Promise<'master' | 'athlete'> => {
-       console.log('🔍 [useAuth] Obteniendo perfil para:', userId)
-       
-       // Verificar cache
-       const cached = profileCache.get(userId)
-       if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_DURATION) {
-         console.log('📋 [useAuth] Usando perfil desde cache:', cached.role)
-         return cached.role
-       }
+    // Función de inicialización inline para evitar dependencias
+    const initializeAuth = async () => {
+      try {
+        console.log('🚀 [useAuth] Iniciando autenticación...')
+        setLoading(true)
+        
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !sessionData?.session?.user) {
+          console.log('🚫 [useAuth] No hay sesión activa')
+          if (mountedRef.current) {
+            setUser(null)
+            setUserRole('athlete')
+            setError(null)
+            setLoading(false)
+            setRoleLoading(false)
+          }
+          return
+        }
 
-       try {
-         const { data: profile, error } = await supabase
-           .from('profiles')
-           .select('role')
-           .eq('id', userId)
-           .single()
+        const user = sessionData.session.user
+        console.log('👤 [useAuth] Usuario encontrado:', user.email)
+        
+        if (mountedRef.current) {
+          setUser(user)
+          setError(null)
+          setLoading(false)
+          setRoleLoading(true) // Comenzar carga del rol
+        }
 
-         if (error) {
-           console.error('❌ [useAuth] Error fetching profile:', error)
-           return 'athlete'
-         }
-
-         const role = (profile?.role as 'master' | 'athlete') || 'athlete'
-         console.log('✅ [useAuth] Perfil obtenido:', role)
-         
-         // Actualizar cache
-         profileCache.set(userId, { role, timestamp: Date.now() })
-         
-         return role
-       } catch (error) {
-         console.error('❌ [useAuth] Error en getProfile:', error)
-         return 'athlete'
-       }
-     }
-
-     // Función de inicialización inline para evitar dependencias
-     const initializeAuth = async () => {
-       try {
-         console.log('🚀 [useAuth] Iniciando autenticación...')
-         
-         const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-         
-         if (sessionError || !sessionData?.session?.user) {
-           console.log('🚫 [useAuth] No hay sesión activa')
-           if (mountedRef.current) {
-             setUser(null)
-             setUserRole('athlete')
-             setError(null)
-             setLoading(false)
-           }
-           return
-         }
-
-         const user = sessionData.session.user
-         console.log('👤 [useAuth] Usuario encontrado:', user.email)
-         
-         if (mountedRef.current) {
-           setUser(user)
-           setLoading(false)
-           setError(null)
-         }
-
-         // Obtener rol en background
-         try {
-           const role = await getProfile(user.id)
-           if (mountedRef.current) {
-             setUserRole(role)
-           }
-         } catch (error) {
-           console.error('❌ [useAuth] Error obteniendo rol:', error)
-           if (mountedRef.current) {
-             setUserRole('athlete')
-           }
-         }
-       } catch (error) {
-         console.error('❌ [useAuth] Error en inicialización:', error)
-         if (mountedRef.current) {
-           setUser(null)
-           setUserRole('athlete')
-           setError('Error de conexión')
-           setLoading(false)
-         }
-       }
-     }
+        // Obtener rol en background
+        try {
+          const role = await fetchUserProfile(user.id)
+          if (mountedRef.current) {
+            setUserRole(role)
+            setRoleLoading(false)
+            console.log('✅ [useAuth] Rol cargado completamente:', role)
+          }
+        } catch (error) {
+          console.error('❌ [useAuth] Error obteniendo rol:', error)
+          if (mountedRef.current) {
+            setUserRole('athlete')
+            setRoleLoading(false)
+          }
+        }
+      } catch (error) {
+        console.error('❌ [useAuth] Error en inicialización:', error)
+        if (mountedRef.current) {
+          setUser(null)
+          setUserRole('athlete')
+          setError('Error de conexión')
+          setLoading(false)
+          setRoleLoading(false)
+        }
+      }
+    }
 
     // Inicializar
     initializeAuth()
@@ -186,17 +158,21 @@ export function useAuth() {
           setUser(session.user)
           setError(null)
           setLoading(false)
+          setRoleLoading(true)
           
           // Obtener rol del usuario (asíncrono)
           try {
-            const role = await getProfile(session.user.id)
+            const role = await fetchUserProfile(session.user.id)
             if (mountedRef.current) {
               setUserRole(role)
+              setRoleLoading(false)
+              console.log('✅ [useAuth] Rol cargado en auth change:', role)
             }
           } catch (error) {
             console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
             if (mountedRef.current) {
               setUserRole('athlete')
+              setRoleLoading(false)
             }
           }
         } else {
@@ -205,6 +181,7 @@ export function useAuth() {
           setUserRole('athlete')
           setError(null)
           setLoading(false)
+          setRoleLoading(false)
           
           // Limpiar cache cuando se cierre sesión
           profileCache.clear()
@@ -220,7 +197,7 @@ export function useAuth() {
       mountedRef.current = false
       subscription.unsubscribe()
     }
-  }, []) // Sin dependencias para evitar remontajes
+  }, [fetchUserProfile]) // Incluir fetchUserProfile como dependencia
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -235,12 +212,23 @@ export function useAuth() {
       if (data.user) {
         // Obtener rol del usuario
         try {
+          setRoleLoading(true)
           const role = await fetchUserProfile(data.user.id)
           setUserRole(role)
-          router.push('/workouts')
+          setRoleLoading(false)
+          
+          // Redirigir según el rol
+          if (role === 'master') {
+            console.log('🔄 [useAuth] Usuario master, redirigiendo a admin')
+            router.push('/admin')
+          } else {
+            console.log('🔄 [useAuth] Usuario athlete, redirigiendo a workouts')
+            router.push('/workouts')
+          }
         } catch (error) {
           console.error('Failed to fetch profile after login:', error)
           setUserRole('athlete')
+          setRoleLoading(false)
           router.push('/workouts')
         }
       }
@@ -266,6 +254,7 @@ export function useAuth() {
       setUser(null)
       setUserRole('athlete')
       setError(null)
+      setRoleLoading(false)
       
       router.push('/login')
     } catch (error) {
@@ -276,12 +265,13 @@ export function useAuth() {
       setUser(null)
       setUserRole('athlete')
       setError(null)
+      setRoleLoading(false)
       router.push('/login')
     }
   }
 
   const requireAuth = (requiredRole?: 'master') => {
-    if (loading) return false
+    if (loading || roleLoading) return false
     
     if (!user) {
       router.push('/login')
@@ -315,6 +305,7 @@ export function useAuth() {
     user,
     userRole,
     loading,
+    roleLoading,
     error,
     signIn,
     signOut,
