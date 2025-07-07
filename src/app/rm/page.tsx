@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ExerciseHistory, getPersonalRecordsGroupedByExercise } from '@/lib/supabase'
 import { ExerciseHistoryCard } from '@/components/exercise-history-card'
 import { toast } from 'sonner'
-import { Plus, Target, Trophy } from 'lucide-react'
+import { Plus, Target, Trophy, ChevronLeft } from 'lucide-react'
 
 export default function PersonalRecordsPage() {
   const { user, loading: authLoading } = useAuth()
@@ -79,15 +79,26 @@ export default function PersonalRecordsPage() {
   }
 
   const headerActions = (
-    <Button onClick={() => setIsFormOpen(true)} size="sm">
-      <Plus className="mr-2 h-4 w-4" />
-      Añadir RM
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => router.push('/workouts')}
+        className="text-muted-foreground"
+      >
+        <ChevronLeft className="mr-1 h-4 w-4" />
+        Workouts
+      </Button>
+      <Button onClick={() => setIsFormOpen(true)} size="sm">
+        <Plus className="mr-2 h-4 w-4" />
+        Add RM
+      </Button>
+    </div>
   )
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title="Mis Récords Máximos" actions={headerActions} />
+      <AppHeader title="RM" actions={headerActions} />
       
       <div className="container mx-auto px-4 py-6 space-y-6">
         {loading ? (
