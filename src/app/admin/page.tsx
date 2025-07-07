@@ -14,6 +14,9 @@ import {
   Plus,
   ArrowRight,
   Tag,
+  Weight,
+  Trophy,
+  Target,
 } from 'lucide-react'
 import Link from 'next/link'
 import { getDashboardMetrics, getCategoryStats, type DashboardMetrics, type CategoryStats } from '@/lib/supabase'
@@ -110,7 +113,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Métricas principales */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -170,9 +173,24 @@ export default function AdminDashboard() {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Total RM
+            </CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.totalPersonalRecords || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {metrics?.personalRecordsThisMonth || 0} este mes
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         {/* Estadísticas por categoría */}
         <Card>
           <CardHeader>
@@ -204,6 +222,42 @@ export default function AdminDashboard() {
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Ejercicios más populares con RM */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Weight className="h-5 w-5" />
+              Ejercicios RM Populares
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {metrics?.topExercises && metrics.topExercises.length > 0 ? (
+              metrics.topExercises.map((exercise) => (
+                <div key={exercise.exercise_name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-3 w-3 text-primary" />
+                    <span className="font-medium text-sm">{exercise.exercise_name}</span>
+                  </div>
+                  <Badge variant="secondary">{exercise.count}</Badge>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay RM registrados aún
+              </p>
+            )}
+            {metrics?.heaviestRecord && (
+              <div className="border-t pt-4 mt-4">
+                <p className="text-xs text-muted-foreground mb-2">RM más pesado:</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{metrics.heaviestRecord.exercise_name}</span>
+                  <Badge variant="default">{metrics.heaviestRecord.weight_kg}kg</Badge>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -248,7 +302,7 @@ export default function AdminDashboard() {
           <CardTitle>Acciones Rápidas</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Button variant="outline" className="h-20 flex-col gap-2" asChild>
               <Link href="/admin/workouts">
                 <Calendar className="h-6 w-6" />
@@ -267,6 +321,13 @@ export default function AdminDashboard() {
               <Link href="/admin/categories">
                 <Tag className="h-6 w-6" />
                 <span>Gestionar Categorías</span>
+              </Link>
+            </Button>
+
+            <Button variant="outline" className="h-20 flex-col gap-2" asChild>
+              <Link href="/rm">
+                <Trophy className="h-6 w-6" />
+                <span>Gestionar RM</span>
               </Link>
             </Button>
             

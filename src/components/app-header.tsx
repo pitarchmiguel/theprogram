@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Dumbbell, Settings, LogOut, Plus, ChevronDown } from 'lucide-react'
+import { Dumbbell, Settings, LogOut, Plus, ChevronDown, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -71,8 +71,13 @@ export function AppHeader({ title = "The Program", actions }: AppHeaderProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push('/rm')}>
+                  <Trophy className="h-4 w-4 mr-2" />
+                  Mis RM
+                </DropdownMenuItem>
                 {userRole === 'master' && (
                   <>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => router.push('/admin')}>
                       <Settings className="h-4 w-4 mr-2" />
                       Panel de Administración
@@ -81,9 +86,9 @@ export function AppHeader({ title = "The Program", actions }: AppHeaderProps) {
                       <Plus className="h-4 w-4 mr-2" />
                       Gestionar Entrenamientos
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                   </>
                 )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}
                   className="text-destructive focus:text-destructive"

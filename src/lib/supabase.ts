@@ -482,6 +482,12 @@ export type DashboardMetrics = {
   activeUsersThisWeek: number
   categoriesUsed: number
   recentActivity: RecentActivity[]
+  // Métricas de RM
+  totalPersonalRecords: number
+  personalRecordsThisMonth: number
+  heaviestRecord?: PersonalRecord
+  recentPersonalRecords: PersonalRecord[]
+  topExercises: { exercise_name: string; count: number }[]
 }
 
 export type RecentActivity = {
@@ -500,6 +506,61 @@ export type UserStats = {
   created_at: string
   last_workout?: string
   total_workouts: number
+}
+
+// Tipo para récords máximos (RM)
+export type PersonalRecord = {
+  id: string
+  user_id: string
+  exercise_name: string
+  weight_kg: number
+  date_achieved: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+// Tipo extendido para RM con información de historial
+export type PersonalRecordWithHistory = PersonalRecord & {
+  weight_rank: number
+  date_rank: number
+  total_records: number
+  previous_weight?: number
+  is_current_weight_pr: boolean
+  is_latest_attempt: boolean
+  is_improvement: boolean
+  improvement_percentage: number
+}
+
+// Tipo para agrupar RM por ejercicio con historial
+export type ExerciseHistory = {
+  exercise_name: string
+  current_pr: PersonalRecord
+  latest_attempt: PersonalRecord
+  total_attempts: number
+  records: PersonalRecord[]
+  progression: {
+    weight_improvement: number
+    weight_improvement_percentage: number
+    days_since_last_pr: number
+  }
+}
+
+// Tipo para crear/actualizar RM (sin campos automáticos)
+export type PersonalRecordInput = {
+  exercise_name: string
+  weight_kg: number
+  date_achieved: string
+  notes?: string
+}
+
+// Tipo para estadísticas de RM
+export type PersonalRecordStats = {
+  total_records: number
+  latest_record?: PersonalRecord
+  heaviest_record?: PersonalRecord
+  recent_improvements: PersonalRecord[]
+  exercises_tracked: string[]
 }
 
 // Función para obtener métricas del dashboard
@@ -537,6 +598,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     // Actividad reciente
     const recentActivity = await getRecentActivity()
 
+    // Estadísticas de RM
+    const rmStats = await getAdminPersonalRecordStats()
+
     return {
       totalWorkouts: totalWorkouts || 0,
       totalUsers: totalUsers || 0,
@@ -544,7 +608,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       workoutsThisMonth: workoutsThisMonth || 0,
       activeUsersThisWeek: 0, // Por implementar
       categoriesUsed: categoriesUsed.length,
-      recentActivity
+      recentActivity,
+      totalPersonalRecords: rmStats.totalPersonalRecords,
+      personalRecordsThisMonth: rmStats.personalRecordsThisMonth,
+      heaviestRecord: rmStats.heaviestRecord,
+      recentPersonalRecords: rmStats.recentPersonalRecords,
+      topExercises: rmStats.topExercises
     }
   } catch (error) {
     console.error('Error fetching dashboard metrics:', error)
@@ -555,7 +624,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       workoutsThisMonth: 0,
       activeUsersThisWeek: 0,
       categoriesUsed: 0,
-      recentActivity: []
+      recentActivity: [],
+      totalPersonalRecords: 0,
+      personalRecordsThisMonth: 0,
+      heaviestRecord: undefined,
+      recentPersonalRecords: [],
+      topExercises: []
     }
   }
 }
@@ -642,5 +716,480 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
   } catch (error) {
     console.error('Error fetching recent activity:', error)
     return []
+  }
+}
+
+// =============================================================================
+// FUNCIONES PARA GESTIONAR RÉCORDS MÁXIMOS (RM)
+// =============================================================================
+
+// Funciones de administración para RM
+
+// Función para obtener estadísticas globales de RM (solo para administradores)
+export async function getAdminPersonalRecordStats(): Promise<{
+  totalPersonalRecords: number
+  personalRecordsThisMonth: number
+  heaviestRecord?: PersonalRecord
+  recentPersonalRecords: PersonalRecord[]
+  topExercises: { exercise_name: string; count: number }[]
+}> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      throw new Error('Usuario no autenticado')
+    }
+
+    // Verificar si es administrador
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'master') {
+      throw new Error('Solo los administradores pueden acceder a estas estadísticas')
+    }
+
+    // Obtener todos los RM del sistema
+    const { data: allRecords, error } = await supabase
+      .from('personal_records')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    const records = allRecords || []
+
+    // Calcular métricas
+    const now = new Date()
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    
+    const totalPersonalRecords = records.length
+    
+    const personalRecordsThisMonth = records.filter((record: PersonalRecord) => 
+      new Date(record.created_at) >= firstDayOfMonth
+    ).length
+
+    // RM más pesado
+    const heaviestRecord = records.reduce((heaviest: PersonalRecord | null, current: PersonalRecord) => {
+      if (!heaviest || current.weight_kg > heaviest.weight_kg) {
+        return current
+      }
+      return heaviest
+    }, null as PersonalRecord | null)
+
+    // RM más recientes (últimos 5)
+    const recentPersonalRecords = records.slice(0, 5)
+
+    // Ejercicios más populares
+    const exerciseCounts = records.reduce((counts: Record<string, number>, record: PersonalRecord) => {
+      counts[record.exercise_name] = (counts[record.exercise_name] || 0) + 1
+      return counts
+    }, {} as Record<string, number>)
+
+    const topExercises = Object.entries(exerciseCounts)
+      .map(([exercise_name, count]) => ({ exercise_name, count: count as number }))
+      .sort((a, b) => (b.count as number) - (a.count as number))
+      .slice(0, 5)
+
+    return {
+      totalPersonalRecords,
+      personalRecordsThisMonth,
+      heaviestRecord: heaviestRecord || undefined,
+      recentPersonalRecords,
+      topExercises
+    }
+  } catch (error) {
+    console.error('Error in getAdminPersonalRecordStats:', error)
+    return {
+      totalPersonalRecords: 0,
+      personalRecordsThisMonth: 0,
+      recentPersonalRecords: [],
+      topExercises: []
+    }
+  }
+}
+
+// =============================================================================
+
+// Función para obtener todos los RM de un usuario
+export async function getPersonalRecords(userId?: string): Promise<PersonalRecord[]> {
+  try {
+    let query = supabase
+      .from('personal_records')
+      .select('*')
+      .order('exercise_name', { ascending: true })
+
+    // Si se especifica userId, filtrar por ese usuario (solo masters pueden ver RM de otros)
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching personal records:', error)
+      throw error
+    }
+
+    return data || []
+  } catch (error) {
+    console.error('Error in getPersonalRecords:', error)
+    throw error
+  }
+}
+
+// Función para obtener un RM específico por ejercicio
+export async function getPersonalRecordByExercise(exerciseName: string, userId?: string): Promise<PersonalRecord | null> {
+  try {
+    let query = supabase
+      .from('personal_records')
+      .select('*')
+      .eq('exercise_name', exerciseName)
+      .single()
+
+    // Si se especifica userId, filtrar por ese usuario
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No encontrado
+        return null
+      }
+      console.error('Error fetching personal record:', error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in getPersonalRecordByExercise:', error)
+    throw error
+  }
+}
+
+// Función para crear un nuevo RM
+export async function createPersonalRecord(record: PersonalRecordInput): Promise<PersonalRecord> {
+  try {
+    // Validaciones
+    if (!record.exercise_name || !record.exercise_name.trim()) {
+      throw new Error('El nombre del ejercicio es requerido')
+    }
+
+    if (!record.weight_kg || record.weight_kg <= 0) {
+      throw new Error('El peso debe ser mayor a 0')
+    }
+
+    if (!record.date_achieved) {
+      throw new Error('La fecha es requerida')
+    }
+
+    // Obtener el usuario actual
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError) {
+      console.error('Error de autenticación:', authError)
+      throw new Error('Error de autenticación')
+    }
+
+    if (!user) {
+      throw new Error('Usuario no autenticado')
+    }
+
+    // Preparar datos para insertar (incluyendo user_id)
+    const recordData = {
+      user_id: user.id,
+      exercise_name: record.exercise_name.trim(),
+      weight_kg: record.weight_kg,
+      date_achieved: record.date_achieved,
+      notes: record.notes?.trim() || null
+    }
+
+    console.log('Insertando personal record con datos completos:', recordData)
+
+    const { data, error } = await supabase
+      .from('personal_records')
+      .insert([recordData])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error completo de Supabase:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+      
+      if (error.code === '23502') {
+        throw new Error('Faltan campos requeridos')
+      } else if (error.code === '42P01') {
+        throw new Error('La tabla de récords personales no existe')
+      } else if (error.code === '42501') {
+        throw new Error('Sin permisos para crear RM')
+      } else {
+        throw new Error(`Error al crear RM: ${error.message || 'Error desconocido'}`)
+      }
+    }
+
+    console.log('Personal record creado exitosamente:', data)
+    return data
+  } catch (error) {
+    console.error('Error in createPersonalRecord:', error)
+    throw error
+  }
+}
+
+// Función para actualizar un RM existente
+export async function updatePersonalRecord(id: string, record: PersonalRecordInput): Promise<PersonalRecord> {
+  try {
+    // Validaciones
+    if (!record.exercise_name || !record.exercise_name.trim()) {
+      throw new Error('El nombre del ejercicio es requerido')
+    }
+
+    if (!record.weight_kg || record.weight_kg <= 0) {
+      throw new Error('El peso debe ser mayor a 0')
+    }
+
+    if (!record.date_achieved) {
+      throw new Error('La fecha es requerida')
+    }
+
+    const updateData = {
+      exercise_name: record.exercise_name.trim(),
+      weight_kg: record.weight_kg,
+      date_achieved: record.date_achieved,
+      notes: record.notes?.trim() || null
+    }
+
+    const { data, error } = await supabase
+      .from('personal_records')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating personal record:', error)
+      if (error.code === '23505') {
+        throw new Error(`Ya tienes un RM registrado para ${record.exercise_name}`)
+      } else if (error.code === 'PGRST116') {
+        throw new Error('RM no encontrado')
+      } else {
+        throw new Error(`Error al actualizar RM: ${error.message}`)
+      }
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in updatePersonalRecord:', error)
+    throw error
+  }
+}
+
+// Función para eliminar un RM
+export async function deletePersonalRecord(id: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('personal_records')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting personal record:', error)
+      if (error.code === 'PGRST116') {
+        throw new Error('RM no encontrado')
+      } else {
+        throw new Error(`Error al eliminar RM: ${error.message}`)
+      }
+    }
+  } catch (error) {
+    console.error('Error in deletePersonalRecord:', error)
+    throw error
+  }
+}
+
+// Función para obtener estadísticas de RM de un usuario
+export async function getPersonalRecordStats(userId?: string): Promise<PersonalRecordStats> {
+  try {
+    const records = await getPersonalRecords(userId)
+
+    if (records.length === 0) {
+      return {
+        total_records: 0,
+        latest_record: undefined,
+        heaviest_record: undefined,
+        recent_improvements: [],
+        exercises_tracked: []
+      }
+    }
+
+    // Último RM por fecha
+    const latestRecord = records.reduce((latest, current) => 
+      new Date(current.date_achieved) > new Date(latest.date_achieved) ? current : latest
+    )
+
+    // RM más pesado
+    const heaviestRecord = records.reduce((heaviest, current) => 
+      current.weight_kg > heaviest.weight_kg ? current : heaviest
+    )
+
+    // Mejoras recientes (últimos 30 días)
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    
+    const recentImprovements = records.filter(record => 
+      new Date(record.date_achieved) >= thirtyDaysAgo
+    ).sort((a, b) => new Date(b.date_achieved).getTime() - new Date(a.date_achieved).getTime())
+
+    // Ejercicios únicos
+    const exercisesTracked = [...new Set(records.map(record => record.exercise_name))].sort()
+
+    return {
+      total_records: records.length,
+      latest_record: latestRecord,
+      heaviest_record: heaviestRecord,
+      recent_improvements: recentImprovements,
+      exercises_tracked: exercisesTracked
+    }
+  } catch (error) {
+    console.error('Error getting personal record stats:', error)
+    return {
+      total_records: 0,
+      latest_record: undefined,
+      heaviest_record: undefined,
+      recent_improvements: [],
+      exercises_tracked: []
+    }
+  }
+}
+
+// Función para obtener ejercicios más comunes (para sugerencias)
+export async function getPopularExercises(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_records')
+      .select('exercise_name')
+      .order('exercise_name')
+
+    if (error) {
+      console.error('Error fetching popular exercises:', error)
+      return []
+    }
+
+    // Contar ocurrencias de cada ejercicio
+    const exerciseCounts = data.reduce((counts: Record<string, number>, record: any) => {
+      const name = record.exercise_name
+      counts[name] = (counts[name] || 0) + 1
+      return counts
+    }, {})
+
+    // Ordenar por popularidad y retornar los nombres
+    return Object.entries(exerciseCounts)
+      .sort(([,a], [,b]) => (b as number) - (a as number))
+      .map(([name]) => name)
+      .slice(0, 20) // Top 20 ejercicios más populares
+  } catch (error) {
+    console.error('Error in getPopularExercises:', error)
+    return []
+  }
+}
+
+// Función para obtener el historial completo agrupado por ejercicio
+export async function getPersonalRecordsGroupedByExercise(userId?: string): Promise<ExerciseHistory[]> {
+  try {
+    const records = await getPersonalRecords(userId)
+    
+    if (records.length === 0) {
+      return []
+    }
+
+    // Agrupar por ejercicio
+    const groupedByExercise = records.reduce((groups: Record<string, PersonalRecord[]>, record) => {
+      if (!groups[record.exercise_name]) {
+        groups[record.exercise_name] = []
+      }
+      groups[record.exercise_name].push(record)
+      return groups
+    }, {})
+
+    // Convertir a formato ExerciseHistory
+    const exerciseHistories: ExerciseHistory[] = Object.entries(groupedByExercise).map(([exerciseName, exerciseRecords]) => {
+      // Ordenar por fecha descendente
+      const sortedRecords = exerciseRecords.sort((a, b) => 
+        new Date(b.date_achieved).getTime() - new Date(a.date_achieved).getTime()
+      )
+
+      // Encontrar RM actual (más pesado) y último intento
+      const currentPr = exerciseRecords.reduce((max, current) => 
+        current.weight_kg > max.weight_kg ? current : max
+      )
+      const latestAttempt = sortedRecords[0] // Más reciente por fecha
+
+      // Calcular progresión
+      const firstRecord = sortedRecords[sortedRecords.length - 1]
+      const weightImprovement = currentPr.weight_kg - firstRecord.weight_kg
+      const weightImprovementPercentage = firstRecord.weight_kg > 0 
+        ? Math.round((weightImprovement / firstRecord.weight_kg) * 100 * 100) / 100 
+        : 0
+
+      const daysSinceLastPr = Math.floor(
+        (Date.now() - new Date(currentPr.date_achieved).getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      return {
+        exercise_name: exerciseName,
+        current_pr: currentPr,
+        latest_attempt: latestAttempt,
+        total_attempts: exerciseRecords.length,
+        records: sortedRecords,
+        progression: {
+          weight_improvement: weightImprovement,
+          weight_improvement_percentage: weightImprovementPercentage,
+          days_since_last_pr: daysSinceLastPr
+        }
+      }
+    })
+
+    // Ordenar por nombre de ejercicio
+    return exerciseHistories.sort((a, b) => a.exercise_name.localeCompare(b.exercise_name))
+  } catch (error) {
+    console.error('Error in getPersonalRecordsGroupedByExercise:', error)
+    throw error
+  }
+}
+
+// Función para obtener el historial de un ejercicio específico
+export async function getExerciseHistory(exerciseName: string, userId?: string): Promise<PersonalRecord[]> {
+  try {
+    let query = supabase
+      .from('personal_records')
+      .select('*')
+      .eq('exercise_name', exerciseName)
+      .order('date_achieved', { ascending: false })
+
+    // Si se especifica userId, filtrar por ese usuario
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching exercise history:', error)
+      throw error
+    }
+
+    return data || []
+  } catch (error) {
+    console.error('Error in getExerciseHistory:', error)
+    throw error
   }
 } 
