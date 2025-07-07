@@ -10,10 +10,6 @@ import { useRouter } from 'next/navigation'
 const profileCache = new Map<string, { role: 'master' | 'athlete', timestamp: number }>()
 const PROFILE_CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
 
-// Estados globales para evitar múltiples inicializaciones
-let globalInitializationInProgress = false
-let globalInitializationPromise: Promise<void> | null = null
-
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -21,10 +17,9 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const mountedRef = useRef(true)
-  const retryCountRef = useRef(0)
   const maxRetries = 3
 
-  // Función para obtener el perfil del usuario
+  // Función para obtener el perfil del usuario (simplificada)
   const fetchUserProfile = useCallback(async (userId: string, retryCount = 0): Promise<'master' | 'athlete'> => {
     console.log('🔍 [useAuth] Obteniendo perfil para:', userId, retryCount > 0 ? `(retry ${retryCount})` : '')
     
@@ -36,17 +31,29 @@ export function useAuth() {
     }
 
     try {
-      const { data: profile, error: profileError } = await supabase
+      // Timeout específico para consulta de perfil
+      const profilePromise = supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .single()
 
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('PROFILE_TIMEOUT')), 10000) // 10s para perfil
+      })
+
+      const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise])
+
       if (profileError) {
         console.error('❌ [useAuth] Error fetching profile:', profileError)
         
         // Retry logic para errores de red
-        if (retryCount < 2 && (profileError.message?.includes('network') || profileError.message?.includes('timeout'))) {
+        if (retryCount < 2 && (
+          profileError.message?.includes('network') || 
+          profileError.message?.includes('timeout') ||
+          profileError.message?.includes('PROFILE_TIMEOUT')
+        )) {
+          console.log(`🔁 [useAuth] Reintentando perfil en ${1000 * (retryCount + 1)}ms...`)
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
           return fetchUserProfile(userId, retryCount + 1)
         }
@@ -66,6 +73,7 @@ export function useAuth() {
       
       // Retry logic para errores de conexión
       if (retryCount < 2) {
+        console.log(`🔁 [useAuth] Reintentando perfil en ${1000 * (retryCount + 1)}ms...`)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
         return fetchUserProfile(userId, retryCount + 1)
       }
@@ -74,65 +82,60 @@ export function useAuth() {
     }
   }, [])
 
-  // Función de inicialización con retry logic
+  // Función simplificada de inicialización
   const performInitialization = useCallback(async (attempt = 1): Promise<void> => {
     console.log(`🚀 [useAuth] Intento de inicialización ${attempt}/${maxRetries}`)
     
     try {
-      // Timeout más agresivo
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 8000)
+      // Paso 1: Obtener sesión (timeout más largo para producción)
+      console.log('🔐 [useAuth] Obteniendo sesión...')
+      
+      const sessionPromise = supabase.auth.getSession()
+      const sessionTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('SESSION_TIMEOUT')), 20000) // 20s para sesión
       })
 
-      // Operación de autenticación
-      const authPromise = (async () => {
-        console.log('🔐 [useAuth] Obteniendo sesión...')
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError) {
-          console.error('❌ [useAuth] Error obteniendo sesión:', sessionError)
-          throw sessionError
-        }
+      const { data: sessionData, error: sessionError } = await Promise.race([
+        sessionPromise, 
+        sessionTimeoutPromise
+      ])
+      
+      if (sessionError) {
+        console.error('❌ [useAuth] Error obteniendo sesión:', sessionError)
+        throw sessionError
+      }
 
-        if (sessionData?.session?.user) {
-          console.log('👤 [useAuth] Usuario encontrado:', sessionData.session.user.email)
-          
-          if (!mountedRef.current) return
-          
-          setUser(sessionData.session.user)
-          
-          // Obtener rol del usuario
-          try {
-            const role = await fetchUserProfile(sessionData.session.user.id)
+      if (!mountedRef.current) return
+
+      if (sessionData?.session?.user) {
+        console.log('👤 [useAuth] Usuario encontrado:', sessionData.session.user.email)
+        setUser(sessionData.session.user)
+        
+        // Paso 2: Obtener rol del usuario (asíncrono, no bloquea)
+        console.log('📝 [useAuth] Obteniendo rol de usuario...')
+        fetchUserProfile(sessionData.session.user.id)
+          .then(role => {
             if (mountedRef.current) {
+              console.log('🎭 [useAuth] Rol establecido:', role)
               setUserRole(role)
-              setError(null)
             }
-          } catch (error) {
-            console.error('❌ [useAuth] Error obteniendo rol:', error)
+          })
+          .catch(error => {
+            console.error('❌ [useAuth] Error obteniendo rol (no crítico):', error)
             if (mountedRef.current) {
               setUserRole('athlete')
             }
-          }
-        } else {
-          console.log('🚫 [useAuth] No hay sesión activa')
-          if (mountedRef.current) {
-            setUser(null)
-            setUserRole('athlete')
-            setError(null)
-          }
-        }
-      })()
-
-      // Race entre timeout y auth
-      await Promise.race([authPromise, timeoutPromise])
-      
-      console.log(`✅ [useAuth] Inicialización exitosa en intento ${attempt}`)
-      
-      if (mountedRef.current) {
-        setLoading(false)
-        setError(null)
+          })
+      } else {
+        console.log('🚫 [useAuth] No hay sesión activa')
+        setUser(null)
+        setUserRole('athlete')
       }
+      
+      // Marcar como cargado independientemente del perfil
+      setError(null)
+      setLoading(false)
+      console.log(`✅ [useAuth] Inicialización exitosa en intento ${attempt}`)
       
     } catch (error) {
       console.error(`❌ [useAuth] Error en intento ${attempt}:`, error)
@@ -153,12 +156,10 @@ export function useAuth() {
         // Todos los intentos fallaron
         console.error('💀 [useAuth] Todos los intentos de inicialización fallaron')
         
-        if (mountedRef.current) {
-          setUser(null)
-          setUserRole('athlete')
-          setError('Error de conexión. Por favor, recarga la página.')
-          setLoading(false)
-        }
+        setUser(null)
+        setUserRole('athlete')
+        setError('Error de conexión. Por favor, recarga la página.')
+        setLoading(false)
       }
     }
   }, [fetchUserProfile, maxRetries])
@@ -166,33 +167,9 @@ export function useAuth() {
   useEffect(() => {
     console.log('🔧 [useAuth] Montando hook...')
     mountedRef.current = true
-    retryCountRef.current = 0
 
-    const initializeAuth = async () => {
-      // Usar sistema de bloqueo global para evitar múltiples inicializaciones
-      if (globalInitializationInProgress && globalInitializationPromise) {
-        console.log('⏸️ [useAuth] Inicialización global en progreso, esperando...')
-        try {
-          await globalInitializationPromise
-        } catch (error) {
-          console.error('❌ [useAuth] Error en inicialización global:', error)
-        }
-        return
-      }
-
-      globalInitializationInProgress = true
-      globalInitializationPromise = performInitialization()
-
-      try {
-        await globalInitializationPromise
-      } finally {
-        globalInitializationInProgress = false
-        globalInitializationPromise = null
-      }
-    }
-
-    // Inicializar auth
-    initializeAuth()
+    // Inicializar auth de forma simple
+    performInitialization()
 
     // Listener para cambios de autenticación
     console.log('👂 [useAuth] Configurando listener de auth state...')
@@ -205,33 +182,33 @@ export function useAuth() {
         if (session?.user) {
           setUser(session.user)
           setError(null)
+          setLoading(false)
           
-          // Obtener rol del usuario
-          try {
-            const role = await fetchUserProfile(session.user.id)
-            if (mountedRef.current) {
-              setUserRole(role)
-            }
-          } catch (error) {
-            console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
-            if (mountedRef.current) {
-              setUserRole('athlete')
-            }
-          }
+          // Obtener rol del usuario (asíncrono)
+          fetchUserProfile(session.user.id)
+            .then(role => {
+              if (mountedRef.current) {
+                setUserRole(role)
+              }
+            })
+            .catch(error => {
+              console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
+              if (mountedRef.current) {
+                setUserRole('athlete')
+              }
+            })
         } else {
           console.log('🚪 [useAuth] Usuario desconectado')
           setUser(null)
           setUserRole('athlete')
           setError(null)
+          setLoading(false)
+          
           // Limpiar cache cuando se cierre sesión
           profileCache.clear()
           if (typeof window !== 'undefined') {
             localStorage.removeItem('userRole')
           }
-        }
-        
-        if (mountedRef.current) {
-          setLoading(false)
         }
       }
     )
@@ -240,14 +217,8 @@ export function useAuth() {
       console.log('🧹 [useAuth] Cleanup')
       mountedRef.current = false
       subscription.unsubscribe()
-      
-      // Reset global state si este componente era el responsable
-      if (globalInitializationInProgress) {
-        globalInitializationInProgress = false
-        globalInitializationPromise = null
-      }
     }
-  }, [fetchUserProfile, performInitialization]) // Dependencias incluidas
+  }, [performInitialization, fetchUserProfile])
 
   const signIn = async (email: string, password: string) => {
     try {
