@@ -217,14 +217,9 @@ export function useAuth() {
           setUserRole(role)
           setRoleLoading(false)
           
-          // Redirigir según el rol
-          if (role === 'master') {
-            console.log('🔄 [useAuth] Usuario master, redirigiendo a admin')
-            router.push('/admin')
-          } else {
-            console.log('🔄 [useAuth] Usuario athlete, redirigiendo a workouts')
-            router.push('/workouts')
-          }
+          // Todos los usuarios van a /workouts después del login
+          console.log('🔄 [useAuth] Usuario autenticado, redirigiendo a workouts')
+          router.push('/workouts')
         } catch (error) {
           console.error('Failed to fetch profile after login:', error)
           setUserRole('athlete')
