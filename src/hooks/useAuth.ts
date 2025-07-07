@@ -8,7 +8,10 @@ import { useRouter } from 'next/navigation'
 
 // Cache del perfil para evitar múltiples llamadas a la base de datos
 const profileCache = new Map<string, { role: 'master' | 'athlete', timestamp: number }>()
-const PROFILE_CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+const PROFILE_CACHE_DURATION = 10 * 60 * 1000 // 10 minutos (aumentado)
+
+// Control de promesas pendientes para evitar duplicados
+const pendingProfileFetches = new Map<string, Promise<'master' | 'athlete'>>()
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -18,80 +21,165 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const mountedRef = useRef(true)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastAuthEventRef = useRef<{ event: AuthChangeEvent; userId?: string; timestamp: number } | null>(null)
 
-  // Función para obtener el perfil del usuario (optimizada)
-  const fetchUserProfile = useCallback(async (userId: string, retryCount = 0): Promise<'master' | 'athlete'> => {
-    console.log('🔍 [useAuth] Obteniendo perfil para:', userId, retryCount > 0 ? `(retry ${retryCount})` : '')
+  // Función para obtener el perfil del usuario (optimizada con control de duplicados)
+  const fetchUserProfile = useCallback(async (userId: string): Promise<'master' | 'athlete'> => {
+    console.log('🔍 [useAuth] Obteniendo perfil para:', userId)
     
-    // Verificar cache
+    // Verificar cache primero
     const cached = profileCache.get(userId)
     if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_DURATION) {
       console.log('📋 [useAuth] Usando perfil desde cache:', cached.role)
       return cached.role
     }
 
-    try {
-      // Consulta simplificada con timeout reducido
-      const profilePromise = supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .maybeSingle() // Usar maybeSingle para evitar errores si no existe
+    // Verificar si ya hay una promesa pendiente para este usuario
+    const pendingFetch = pendingProfileFetches.get(userId)
+    if (pendingFetch) {
+      console.log('⏳ [useAuth] Esperando fetch pendiente...')
+      return pendingFetch
+    }
 
-      // Timeout reducido a 5 segundos para evitar bloqueos largos
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('PROFILE_TIMEOUT')), 5000)
-      })
-
-      const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise])
-
-      if (profileError) {
-        console.error('❌ [useAuth] Error fetching profile:', profileError)
+    // Crear nueva promesa y almacenarla
+    const fetchPromise = (async (): Promise<'master' | 'athlete'> => {
+      try {
+        console.log('🌐 [useAuth] Realizando consulta a base de datos...')
         
-        // Si hay error, regresar rol por defecto después de unos pocos intentos
-        if (retryCount < 1 && (
-          profileError.message?.includes('network') || 
-          profileError.message?.includes('timeout') ||
-          profileError.message?.includes('PROFILE_TIMEOUT')
-        )) {
-          console.log(`🔁 [useAuth] Reintentando perfil en ${1000 * (retryCount + 1)}ms...`)
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-          return fetchUserProfile(userId, retryCount + 1)
+        // Consulta con timeout más largo y AbortController
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle()
+          .abortSignal(controller.signal)
+
+        clearTimeout(timeoutId)
+
+        if (profileError) {
+          console.error('❌ [useAuth] Error fetching profile:', profileError)
+          throw profileError
+        }
+
+        const role = (profile?.role as 'master' | 'athlete') || 'athlete'
+        console.log('✅ [useAuth] Perfil obtenido:', role)
+        
+        // Actualizar cache
+        profileCache.set(userId, { role, timestamp: Date.now() })
+        
+        return role
+      } catch (error) {
+        console.error('❌ [useAuth] Error en fetchUserProfile:', error)
+        
+        // Para AbortError o timeouts, intentar obtener del cache expirado como fallback
+        const expiredCache = profileCache.get(userId)
+        if (expiredCache) {
+          console.log('🔄 [useAuth] Usando cache expirado como fallback:', expiredCache.role)
+          return expiredCache.role
         }
         
-        // Después de fallos, asumir athlete para no bloquear la app
-        console.warn('⚠️ [useAuth] Asignando rol athlete por defecto debido a errores persistentes')
+        // Fallback final: athlete
+        console.warn('⚠️ [useAuth] Asignando rol athlete por defecto')
         return 'athlete'
+      } finally {
+        // Limpiar la promesa pendiente
+        pendingProfileFetches.delete(userId)
       }
+    })()
 
-      const role = (profile?.role as 'master' | 'athlete') || 'athlete'
-      console.log('✅ [useAuth] Perfil obtenido:', role)
-      
-      // Actualizar cache
-      profileCache.set(userId, { role, timestamp: Date.now() })
-      
-      return role
-    } catch (error) {
-      console.error('❌ [useAuth] Error en fetchUserProfile:', error)
-      
-      // Solo un reintento para timeout/network errors
-      if (retryCount < 1) {
-        console.log(`🔁 [useAuth] Reintentando perfil en ${1000 * (retryCount + 1)}ms...`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-        return fetchUserProfile(userId, retryCount + 1)
-      }
-      
-      // Fallback: asumir athlete para no bloquear la app
-      console.warn('⚠️ [useAuth] Asignando rol athlete por defecto debido a errores persistentes')
-      return 'athlete'
-    }
+    // Almacenar la promesa pendiente
+    pendingProfileFetches.set(userId, fetchPromise)
+    
+    return fetchPromise
   }, [])
+
+  // Función para manejar cambios de auth con debounce
+  const handleAuthChange = useCallback(async (event: AuthChangeEvent, session: Session | null) => {
+    if (!mountedRef.current) return
+    
+    const now = Date.now()
+    const lastEvent = lastAuthEventRef.current
+    
+    // Evitar eventos duplicados muy rápidos
+    if (lastEvent && 
+        lastEvent.event === event && 
+        lastEvent.userId === session?.user?.id && 
+        now - lastEvent.timestamp < 1000) {
+      console.log('🚫 [useAuth] Evento duplicado ignorado:', event)
+      return
+    }
+    
+    // Actualizar referencia del último evento
+    lastAuthEventRef.current = { event, userId: session?.user?.id, timestamp: now }
+    
+    console.log('🔄 [useAuth] Auth state change:', event, !!session)
+    
+    if (session?.user) {
+      setUser(session.user)
+      setError(null)
+      setLoading(false)
+      setRoleLoading(true)
+      
+      // Obtener rol del usuario (asíncrono)
+      try {
+        const role = await fetchUserProfile(session.user.id)
+        if (mountedRef.current) {
+          setUserRole(role)
+          setRoleLoading(false)
+          console.log('✅ [useAuth] Rol cargado en auth change:', role)
+        }
+      } catch (error) {
+        console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
+        if (mountedRef.current) {
+          setUserRole('athlete')
+          setRoleLoading(false)
+        }
+      }
+    } else {
+      console.log('🚪 [useAuth] Usuario desconectado')
+      setUser(null)
+      setUserRole('athlete')
+      setError(null)
+      setLoading(false)
+      setRoleLoading(false)
+      
+      // Limpiar cache y promesas pendientes
+      profileCache.clear()
+      pendingProfileFetches.clear()
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('userRole')
+      }
+    }
+  }, [fetchUserProfile])
+
+  // Función debounced para auth changes
+  const debouncedAuthChange = useCallback((event: AuthChangeEvent, session: Session | null) => {
+    // Limpiar timer anterior
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    
+    // Para eventos críticos, no hacer debounce
+    if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+      handleAuthChange(event, session)
+      return
+    }
+    
+    // Para otros eventos, hacer debounce de 300ms
+    debounceTimerRef.current = setTimeout(() => {
+      handleAuthChange(event, session)
+    }, 300)
+  }, [handleAuthChange])
 
   useEffect(() => {
     console.log('🔧 [useAuth] Montando hook...')
     mountedRef.current = true
 
-    // Función de inicialización inline para evitar dependencias
+    // Función de inicialización
     const initializeAuth = async () => {
       try {
         console.log('🚀 [useAuth] Iniciando autenticación...')
@@ -118,7 +206,7 @@ export function useAuth() {
           setUser(user)
           setError(null)
           setLoading(false)
-          setRoleLoading(true) // Comenzar carga del rol
+          setRoleLoading(true)
         }
 
         // Obtener rol en background
@@ -151,58 +239,22 @@ export function useAuth() {
     // Inicializar
     initializeAuth()
 
-    // Listener para cambios de autenticación
+    // Listener para cambios de autenticación con debounce
     console.log('👂 [useAuth] Configurando listener de auth state...')
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        if (!mountedRef.current) return
-        
-        console.log('🔄 [useAuth] Auth state change:', event, !!session)
-        
-        if (session?.user) {
-          setUser(session.user)
-          setError(null)
-          setLoading(false)
-          setRoleLoading(true)
-          
-          // Obtener rol del usuario (asíncrono)
-          try {
-            const role = await fetchUserProfile(session.user.id)
-            if (mountedRef.current) {
-              setUserRole(role)
-              setRoleLoading(false)
-              console.log('✅ [useAuth] Rol cargado en auth change:', role)
-            }
-          } catch (error) {
-            console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
-            if (mountedRef.current) {
-              setUserRole('athlete')
-              setRoleLoading(false)
-            }
-          }
-        } else {
-          console.log('🚪 [useAuth] Usuario desconectado')
-          setUser(null)
-          setUserRole('athlete')
-          setError(null)
-          setLoading(false)
-          setRoleLoading(false)
-          
-          // Limpiar cache cuando se cierre sesión
-          profileCache.clear()
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('userRole')
-          }
-        }
-      }
-    )
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(debouncedAuthChange)
 
     return () => {
       console.log('🧹 [useAuth] Cleanup')
       mountedRef.current = false
       subscription.unsubscribe()
+      
+      // Limpiar timers y promesas pendientes
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      pendingProfileFetches.clear()
     }
-  }, [fetchUserProfile]) // Incluir fetchUserProfile como dependencia
+  }, [fetchUserProfile, debouncedAuthChange])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -241,8 +293,9 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
-      // Limpiar cache
+      // Limpiar cache y promesas pendientes
       profileCache.clear()
+      pendingProfileFetches.clear()
       
       // Limpiar sesiones locales
       await clearAllSessions()
@@ -261,6 +314,7 @@ export function useAuth() {
       console.error('Error signing out:', error)
       // Forzar logout local incluso si falla el logout remoto
       profileCache.clear()
+      pendingProfileFetches.clear()
       await clearAllSessions()
       setUser(null)
       setUserRole('athlete')
