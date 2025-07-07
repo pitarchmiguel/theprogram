@@ -17,7 +17,6 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const mountedRef = useRef(true)
-  const maxRetries = 3
 
   // Función para obtener el perfil del usuario (simplificada)
   const fetchUserProfile = useCallback(async (userId: string, retryCount = 0): Promise<'master' | 'athlete'> => {
@@ -82,94 +81,98 @@ export function useAuth() {
     }
   }, [])
 
-  // Función simplificada de inicialización
-  const performInitialization = useCallback(async (attempt = 1): Promise<void> => {
-    console.log(`🚀 [useAuth] Intento de inicialización ${attempt}/${maxRetries}`)
-    
-    try {
-      // Paso 1: Obtener sesión (timeout más largo para producción)
-      console.log('🔐 [useAuth] Obteniendo sesión...')
-      
-      const sessionPromise = supabase.auth.getSession()
-      const sessionTimeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('SESSION_TIMEOUT')), 20000) // 20s para sesión
-      })
-
-      const { data: sessionData, error: sessionError } = await Promise.race([
-        sessionPromise, 
-        sessionTimeoutPromise
-      ])
-      
-      if (sessionError) {
-        console.error('❌ [useAuth] Error obteniendo sesión:', sessionError)
-        throw sessionError
-      }
-
-      if (!mountedRef.current) return
-
-      if (sessionData?.session?.user) {
-        console.log('👤 [useAuth] Usuario encontrado:', sessionData.session.user.email)
-        setUser(sessionData.session.user)
-        
-        // Paso 2: Obtener rol del usuario (asíncrono, no bloquea)
-        console.log('📝 [useAuth] Obteniendo rol de usuario...')
-        fetchUserProfile(sessionData.session.user.id)
-          .then(role => {
-            if (mountedRef.current) {
-              console.log('🎭 [useAuth] Rol establecido:', role)
-              setUserRole(role)
-            }
-          })
-          .catch(error => {
-            console.error('❌ [useAuth] Error obteniendo rol (no crítico):', error)
-            if (mountedRef.current) {
-              setUserRole('athlete')
-            }
-          })
-      } else {
-        console.log('🚫 [useAuth] No hay sesión activa')
-        setUser(null)
-        setUserRole('athlete')
-      }
-      
-      // Marcar como cargado independientemente del perfil
-      setError(null)
-      setLoading(false)
-      console.log(`✅ [useAuth] Inicialización exitosa en intento ${attempt}`)
-      
-    } catch (error) {
-      console.error(`❌ [useAuth] Error en intento ${attempt}:`, error)
-      
-      if (!mountedRef.current) return
-      
-      if (attempt < maxRetries) {
-        // Esperar antes del siguiente intento (backoff exponencial)
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
-        console.log(`⏳ [useAuth] Esperando ${delay}ms antes del siguiente intento...`)
-        
-        await new Promise(resolve => setTimeout(resolve, delay))
-        
-        if (mountedRef.current) {
-          return performInitialization(attempt + 1)
-        }
-      } else {
-        // Todos los intentos fallaron
-        console.error('💀 [useAuth] Todos los intentos de inicialización fallaron')
-        
-        setUser(null)
-        setUserRole('athlete')
-        setError('Error de conexión. Por favor, recarga la página.')
-        setLoading(false)
-      }
-    }
-  }, [fetchUserProfile, maxRetries])
-
   useEffect(() => {
     console.log('🔧 [useAuth] Montando hook...')
     mountedRef.current = true
 
-    // Inicializar auth de forma simple
-    performInitialization()
+         // Función inline para obtener perfil
+     const getProfile = async (userId: string): Promise<'master' | 'athlete'> => {
+       console.log('🔍 [useAuth] Obteniendo perfil para:', userId)
+       
+       // Verificar cache
+       const cached = profileCache.get(userId)
+       if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_DURATION) {
+         console.log('📋 [useAuth] Usando perfil desde cache:', cached.role)
+         return cached.role
+       }
+
+       try {
+         const { data: profile, error } = await supabase
+           .from('profiles')
+           .select('role')
+           .eq('id', userId)
+           .single()
+
+         if (error) {
+           console.error('❌ [useAuth] Error fetching profile:', error)
+           return 'athlete'
+         }
+
+         const role = (profile?.role as 'master' | 'athlete') || 'athlete'
+         console.log('✅ [useAuth] Perfil obtenido:', role)
+         
+         // Actualizar cache
+         profileCache.set(userId, { role, timestamp: Date.now() })
+         
+         return role
+       } catch (error) {
+         console.error('❌ [useAuth] Error en getProfile:', error)
+         return 'athlete'
+       }
+     }
+
+     // Función de inicialización inline para evitar dependencias
+     const initializeAuth = async () => {
+       try {
+         console.log('🚀 [useAuth] Iniciando autenticación...')
+         
+         const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+         
+         if (sessionError || !sessionData?.session?.user) {
+           console.log('🚫 [useAuth] No hay sesión activa')
+           if (mountedRef.current) {
+             setUser(null)
+             setUserRole('athlete')
+             setError(null)
+             setLoading(false)
+           }
+           return
+         }
+
+         const user = sessionData.session.user
+         console.log('👤 [useAuth] Usuario encontrado:', user.email)
+         
+         if (mountedRef.current) {
+           setUser(user)
+           setLoading(false)
+           setError(null)
+         }
+
+         // Obtener rol en background
+         try {
+           const role = await getProfile(user.id)
+           if (mountedRef.current) {
+             setUserRole(role)
+           }
+         } catch (error) {
+           console.error('❌ [useAuth] Error obteniendo rol:', error)
+           if (mountedRef.current) {
+             setUserRole('athlete')
+           }
+         }
+       } catch (error) {
+         console.error('❌ [useAuth] Error en inicialización:', error)
+         if (mountedRef.current) {
+           setUser(null)
+           setUserRole('athlete')
+           setError('Error de conexión')
+           setLoading(false)
+         }
+       }
+     }
+
+    // Inicializar
+    initializeAuth()
 
     // Listener para cambios de autenticación
     console.log('👂 [useAuth] Configurando listener de auth state...')
@@ -185,18 +188,17 @@ export function useAuth() {
           setLoading(false)
           
           // Obtener rol del usuario (asíncrono)
-          fetchUserProfile(session.user.id)
-            .then(role => {
-              if (mountedRef.current) {
-                setUserRole(role)
-              }
-            })
-            .catch(error => {
-              console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
-              if (mountedRef.current) {
-                setUserRole('athlete')
-              }
-            })
+          try {
+            const role = await getProfile(session.user.id)
+            if (mountedRef.current) {
+              setUserRole(role)
+            }
+          } catch (error) {
+            console.error('❌ [useAuth] Error obteniendo rol en auth change:', error)
+            if (mountedRef.current) {
+              setUserRole('athlete')
+            }
+          }
         } else {
           console.log('🚪 [useAuth] Usuario desconectado')
           setUser(null)
@@ -218,7 +220,7 @@ export function useAuth() {
       mountedRef.current = false
       subscription.unsubscribe()
     }
-  }, [performInitialization, fetchUserProfile])
+  }, []) // Sin dependencias para evitar remontajes
 
   const signIn = async (email: string, password: string) => {
     try {

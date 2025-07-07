@@ -7,25 +7,31 @@ import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 
 export default function Home() {
-  const { user, loading, error } = useAuth()
+  const { user, userRole, loading, error } = useAuth()
   const router = useRouter()
   const [hasRedirected, setHasRedirected] = useState(false)
 
   useEffect(() => {
+    // Solo redirigir cuando no esté cargando, no haya error, y no hayamos redirigido ya
     if (!loading && !error && !hasRedirected) {
       setHasRedirected(true)
       
       if (!user) {
         // Sin usuario, redirigir al login
-        console.log('🏠 [Home] Redirigiendo a login...')
+        console.log('🏠 [Home] Sin usuario, redirigiendo a login...')
         router.push('/login')
       } else {
-        // Usuario autenticado (master o athlete), redirigir a workouts
-        console.log('🏠 [Home] Usuario autenticado, redirigiendo a workouts...')
-        router.push('/workouts')
+        // Usuario autenticado - redirigir según rol
+        if (userRole === 'master') {
+          console.log('🏠 [Home] Usuario master, redirigiendo a admin...')
+          router.push('/admin')
+        } else {
+          console.log('🏠 [Home] Usuario athlete, redirigiendo a workouts...')
+          router.push('/workouts')
+        }
       }
     }
-  }, [loading, user, error, router, hasRedirected])
+  }, [loading, user, userRole, error, router, hasRedirected])
 
   // Función para recargar la página cuando hay error
   const handleRetry = () => {
@@ -56,14 +62,19 @@ export default function Home() {
     )
   }
 
-  // Mostrar loading mientras se verifica
+  // Mostrar loading mientras se verifica usuario y rol
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center space-y-4">
         <Spinner size="lg" />
         <p className="text-gray-600 mt-4">
-          Verificando usuario...
+          {user ? 'Verificando permisos...' : 'Verificando usuario...'}
         </p>
+        {user && (
+          <p className="text-sm text-gray-500">
+            Usuario: {user.email}
+          </p>
+        )}
       </div>
     </div>
   )

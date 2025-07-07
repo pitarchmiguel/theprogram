@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminSidebar } from '@/components/admin-sidebar'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -13,8 +13,6 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
-import { Button } from '@/components/ui/button'
-import { RefreshCw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -23,69 +21,42 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, userRole, loading, error: authError } = useAuth()
+  const { user, userRole, loading } = useAuth()
   const router = useRouter()
-  const [isTimeout, setIsTimeout] = useState(false)
 
+  // Redirección simple sin estado complejo
   useEffect(() => {
-    if (!loading && (!user || userRole !== 'master')) {
-      router.push('/workouts')
-    }
-  }, [user, userRole, loading, router])
-
-  // Timeout para carga de autenticación
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        setIsTimeout(true)
+    if (!loading) {
+      if (!user) {
+        console.log('🛡️ [AdminLayout] Sin usuario, redirigiendo...')
+        router.replace('/')
+      } else if (userRole !== 'master') {
+        console.log('🛡️ [AdminLayout] No es master, redirigiendo a workouts...', { userRole })
+        router.replace('/workouts')
+      } else {
+        console.log('🛡️ [AdminLayout] Usuario master verificado ✅')
       }
-    }, 15000) // 15 segundos timeout
+    }
+  }, [loading, user, userRole, router])
 
-    return () => clearTimeout(timeoutId)
-  }, [loading])
-
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-4">
           <Spinner size="xl" />
-          <span>Verificando permisos de administrador...</span>
-          {authError && (
-            <div className="text-center text-sm text-red-500 max-w-xs">
-              <p>{authError}</p>
-            </div>
-          )}
-          {(isTimeout || authError) && (
-            <div className="text-center text-sm text-muted-foreground max-w-xs">
-              <p>La verificación está tardando más de lo normal.</p>
-              <div className="flex gap-2 mt-2 justify-center">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => window.location.reload()}
-                >
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Reintentar
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => router.push('/workouts')}
-                >
-                  Ir a Entrenamientos
-                </Button>
-              </div>
-            </div>
-          )}
+          <span>Verificando permisos...</span>
         </div>
       </div>
     )
   }
 
+  // Quick check - si no es master, return null mientras redirige
   if (!user || userRole !== 'master') {
     return null
   }
 
+  // Render admin layout
   return (
     <SidebarProvider>
       <AdminSidebar />
