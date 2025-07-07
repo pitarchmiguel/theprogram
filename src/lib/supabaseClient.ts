@@ -15,11 +15,10 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        persistSession: true, // Mantener sesión pero con mejor limpieza
+        persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
         flowType: 'pkce',
-        // Configurar tiempo de sesión más estricto
         storageKey: 'supabase.auth.token',
         storage: {
           getItem: (key: string) => {
@@ -39,9 +38,40 @@ export function createClient() {
             }
           }
         }
+      },
+      global: {
+        headers: {
+          'x-client-timeout': '8000' // Timeout de 8 segundos
+        },
+        fetch: (url, options = {}) => {
+          // Configurar timeout personalizado para todas las requests
+          const controller = new AbortController()
+          const timeout = setTimeout(() => {
+            console.warn('⏰ [Supabase] Request timeout, abortando...')
+            controller.abort()
+          }, 8000) // 8 segundos
+
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+          }).finally(() => {
+            clearTimeout(timeout)
+          })
+        }
       }
     }
   )
+
+  // Añadir listener para errores de conexión
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => {
+      console.log('🌐 [Supabase] Conexión restaurada')
+    })
+    
+    window.addEventListener('offline', () => {
+      console.warn('📶 [Supabase] Conexión perdida')
+    })
+  }
 
   return client
 }
@@ -98,5 +128,17 @@ export async function forceLogout() {
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
     }
+  }
+}
+
+// Función para verificar conectividad
+export async function checkConnectivity(): Promise<boolean> {
+  try {
+    const client = createClient()
+    const { error } = await client.from('profiles').select('id').limit(1)
+    return !error
+  } catch (error) {
+    console.error('❌ [Connectivity] Error de conectividad:', error)
+    return false
   }
 } 
