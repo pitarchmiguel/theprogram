@@ -17,6 +17,7 @@ import { AdvancedFilter, type AdvancedFilterOptions } from '@/components/advance
 import { CategoryStatsDisplay } from '@/components/category-stats'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/useAuth'
+import { RMCalculator } from '@/components/rm-calculator'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -325,6 +326,12 @@ export default function WorkoutsPage() {
                                   </TooltipContent>
                                 </Tooltip>
                                 {block.category && <CategoryBadge category={block.category} />}
+                                {block.enableRMCalculator && (
+                                  <RMCalculator 
+                                    exerciseTitle={block.title || 'Sin título'} 
+                                    blockLetter={block.letter || '?'} 
+                                  />
+                                )}
                               </div>
                               {block.description && (
                                 <div className="text-sm text-muted-foreground whitespace-pre-wrap">

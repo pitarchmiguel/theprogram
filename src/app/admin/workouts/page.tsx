@@ -52,7 +52,8 @@ function ManageWorkoutsContent() {
       title: '',
       description: '',
       notes: '',
-      category: undefined
+      category: undefined,
+      enableRMCalculator: false
     }
   ])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -173,7 +174,8 @@ function ManageWorkoutsContent() {
         title: '',
         description: '',
         notes: '',
-        category: undefined
+        category: undefined,
+        enableRMCalculator: false
       }])
       
       // Cerrar dialog
@@ -211,12 +213,13 @@ function ManageWorkoutsContent() {
       title: '',
       description: '',
       notes: '',
-      category: undefined
+      category: undefined,
+      enableRMCalculator: false
     }
     setBlocks([...blocks, newBlock])
   }
 
-  const updateBlock = (id: string, field: keyof Block, value: string | undefined) => {
+  const updateBlock = (id: string, field: keyof Block, value: string | undefined | boolean) => {
     setBlocks(blocks.map(block => 
       block.id === id ? { ...block, [field]: value } : block
     ))
@@ -265,7 +268,8 @@ function ManageWorkoutsContent() {
         title: '',
         description: '',
         notes: '',
-        category: undefined
+        category: undefined,
+        enableRMCalculator: false
       }])
       
     } catch (error: unknown) {
@@ -567,6 +571,19 @@ function ManageWorkoutsContent() {
                 />
               </div>
 
+              <div className="space-y-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={`rm-calculator-${block.id}`}
+                  checked={block.enableRMCalculator || false}
+                  onChange={(e) => updateBlock(block.id, 'enableRMCalculator', e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor={`rm-calculator-${block.id}`} className="text-sm font-normal cursor-pointer">
+                  Habilitar calculadora de 1RM
+                </Label>
+              </div>
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor={`title-${block.id}`}>Título del bloque</Label>
                 <Input
@@ -630,7 +647,8 @@ function ManageWorkoutsContent() {
               title: '',
               description: '',
               notes: '',
-              category: undefined
+              category: undefined,
+              enableRMCalculator: false
             }])
             setError(null)
           }}

@@ -46,6 +46,7 @@ export type Block = {
   description: string
   notes: string
   category?: WorkoutCategory
+  enableRMCalculator?: boolean
 }
 
 // Tipo para entrenamientos
