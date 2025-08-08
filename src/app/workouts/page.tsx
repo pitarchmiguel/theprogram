@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -15,9 +16,7 @@ import { AppHeader } from '@/components/app-header'
 import { CategoryBadge } from '@/components/category-selector'
 import { AdvancedFilter, type AdvancedFilterOptions } from '@/components/advanced-filter'
 import { CategoryStatsDisplay } from '@/components/category-stats'
-import { Spinner } from '@/components/ui/spinner'
-import { useAuth } from '@/hooks/useAuth'
-import { RMCalculator } from '@/components/rm-calculator'
+import { RMCalculator, PercentagesTable } from '@/components/rm-calculator'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -34,6 +33,7 @@ export default function WorkoutsPage() {
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterOptions>({
     categories: []
   })
+  const [workoutTableData, setWorkoutTableData] = useState<{ [workoutId: string]: { percentages: number[], weights: string[] } | null }>({})
 
   // Verificar autenticación
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function WorkoutsPage() {
       try {
         setLoading(true)
         setError(null)
-        
+
         // Si hay filtros avanzados activos, usarlos
         if (advancedFilters.categories.length > 0 || advancedFilters.startDate || advancedFilters.endDate) {
           const data = await getWorkoutsWithFilters({
@@ -76,23 +76,6 @@ export default function WorkoutsPage() {
     loadWorkouts()
   }, [selectedDate, advancedFilters, user, authLoading])
 
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Spinner />
-          <span>Verificando autenticación...</span>
-        </div>
-      </div>
-    )
-  }
-
-  // If no user, show nothing (redirect will happen)
-  if (!user) {
-    return null
-  }
-
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
@@ -116,18 +99,6 @@ export default function WorkoutsPage() {
     return aLetter.localeCompare(bLetter, 'es');
   });
 
-  // Show loading while checking auth
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Spinner />
-          <span>Cargando...</span>
-        </div>
-      </div>
-    )
-  }
-
   const nextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1))
   const prevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1))
 
@@ -143,6 +114,13 @@ export default function WorkoutsPage() {
     })
   }
 
+  const handleTableData = (workoutId: string, data: { percentages: number[], weights: string[] } | null) => {
+    setWorkoutTableData(prev => ({
+      ...prev,
+      [workoutId]: data
+    }))
+  }
+
   const hasActiveFilters = advancedFilters.categories.length > 0 || advancedFilters.startDate || advancedFilters.endDate
 
   // Filtro para el header
@@ -156,6 +134,18 @@ export default function WorkoutsPage() {
       />
     </div>
   )
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+          <span>Cargando...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -328,8 +318,7 @@ export default function WorkoutsPage() {
                                 {block.category && <CategoryBadge category={block.category} />}
                                 {block.enableRMCalculator && (
                                   <RMCalculator 
-                                    exerciseTitle={block.title || 'Sin título'} 
-                                    blockLetter={block.letter || '?'} 
+                                    onTableData={(data) => handleTableData(workout.id, data)}
                                   />
                                 )}
                               </div>
@@ -371,6 +360,16 @@ export default function WorkoutsPage() {
                       ) : (
                         <div className="text-sm text-muted-foreground">
                           No hay bloques definidos para este entrenamiento
+                        </div>
+                      )}
+                      
+                      {/* Tabla de porcentajes debajo del workout */}
+                      {workoutTableData[workout.id] && (
+                        <div className="mt-4 pt-4 border-t">
+                          <PercentagesTable 
+                            percentages={workoutTableData[workout.id]!.percentages}
+                            weights={workoutTableData[workout.id]!.weights}
+                          />
                         </div>
                       )}
                     </CardContent>
