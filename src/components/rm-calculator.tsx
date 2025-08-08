@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,6 +43,12 @@ export function PercentagesTable({ percentages, weights }: PercentagesTableProps
 export function RMCalculator({ onTableData, blockId }: RMCalculatorProps) {
   const [maxWeight, setMaxWeight] = useState('')
   const [isExpanded, setIsExpanded] = useState(false)
+  const onTableDataRef = useRef(onTableData)
+
+  // Actualizar la ref cuando cambie onTableData
+  useEffect(() => {
+    onTableDataRef.current = onTableData
+  }, [onTableData])
 
   // Porcentajes: 70, 75, 80, 85, 90, 95, 100
   const percentages = useMemo(() => [70, 75, 80, 85, 90, 95, 100], [])
@@ -59,22 +65,30 @@ export function RMCalculator({ onTableData, blockId }: RMCalculatorProps) {
         if (parsedData.maxWeight && parsedData.isExpanded !== undefined) {
           setMaxWeight(parsedData.maxWeight)
           setIsExpanded(parsedData.isExpanded)
-          
-          // Calcular y enviar los pesos si hay un peso guardado
-          const numValue = parseFloat(parsedData.maxWeight)
-          if (!isNaN(numValue) && numValue > 0) {
-            const weights = percentages.map(p => {
-              const calculatedWeight = (numValue * p) / 100
-              return calculatedWeight.toFixed(1)
-            })
-            onTableData?.({ percentages, weights })
-          }
         }
       } catch (error) {
         console.error('Error loading saved RM data:', error)
       }
     }
-  }, [storageKey, onTableData, percentages])
+  }, [storageKey])
+
+  // Efecto separado para calcular y enviar los pesos cuando maxWeight cambie
+  useEffect(() => {
+    if (maxWeight && isExpanded) {
+      const numValue = parseFloat(maxWeight)
+      if (!isNaN(numValue) && numValue > 0) {
+        const weights = percentages.map(p => {
+          const calculatedWeight = (numValue * p) / 100
+          return calculatedWeight.toFixed(1)
+        })
+        onTableDataRef.current?.({ percentages, weights })
+      } else {
+        onTableDataRef.current?.(null)
+      }
+    } else if (!isExpanded) {
+      onTableDataRef.current?.(null)
+    }
+  }, [maxWeight, isExpanded, percentages])
 
   // Guardar datos cuando cambien
   useEffect(() => {
@@ -89,7 +103,7 @@ export function RMCalculator({ onTableData, blockId }: RMCalculatorProps) {
     setIsExpanded(!isExpanded)
     if (!isExpanded) {
       setMaxWeight('')
-      onTableData?.(null)
+      onTableDataRef.current?.(null)
       // Limpiar datos guardados cuando se cierra
       localStorage.removeItem(storageKey)
     }
@@ -97,16 +111,6 @@ export function RMCalculator({ onTableData, blockId }: RMCalculatorProps) {
 
   const handleWeightChange = (value: string) => {
     setMaxWeight(value)
-    const numValue = parseFloat(value)
-    if (value && !isNaN(numValue) && numValue > 0) {
-      const weights = percentages.map(p => {
-        const calculatedWeight = (numValue * p) / 100
-        return calculatedWeight.toFixed(1)
-      })
-      onTableData?.({ percentages, weights })
-    } else {
-      onTableData?.(null)
-    }
   }
 
   return (
