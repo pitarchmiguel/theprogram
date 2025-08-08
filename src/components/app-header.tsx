@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Dumbbell, Settings, LogOut, Plus, ChevronDown, Trophy } from 'lucide-react'
+import { Settings, LogOut, Plus, ChevronDown, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -40,9 +40,6 @@ export function AppHeader({ title = "The Program", actions }: AppHeaderProps) {
     <header className="border-b bg-card">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary rounded-full">
-            <Dumbbell className="h-5 w-5 text-primary-foreground" />
-          </div>
           <h1 className="text-lg font-semibold">{title}</h1>
         </div>
         <div className="flex items-center gap-3">

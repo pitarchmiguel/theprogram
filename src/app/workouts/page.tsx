@@ -149,7 +149,7 @@ export default function WorkoutsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title="Entrenamientos" actions={headerActions} />
+      <AppHeader title="theprogram" actions={headerActions} />
       
       <main className="container mx-auto px-4 py-4 space-y-6 max-w-md mx-auto">
         {/* Estadísticas cuando hay filtros activos */}
