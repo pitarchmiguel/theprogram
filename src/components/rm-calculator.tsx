@@ -19,7 +19,7 @@ interface PercentagesTableProps {
 export function PercentagesTable({ percentages, weights }: PercentagesTableProps) {
   return (
     <Card className="border-0 shadow-none bg-background/50">
-      <CardContent className="pt-0">
+      <CardContent className="p-0">
         <div className="w-full">
           <div className="grid grid-cols-7 gap-6">
             {percentages.map((p) => (
