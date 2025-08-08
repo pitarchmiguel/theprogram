@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Calculator } from 'lucide-react'
 interface RMCalculatorProps {
   exerciseTitle?: string
   onTableData?: (data: { percentages: number[], weights: string[] } | null) => void
+  blockId?: string
 }
 
 interface PercentagesTableProps {
@@ -29,7 +30,7 @@ export function PercentagesTable({ percentages, weights }: PercentagesTableProps
             ))}
             {weights.map((weight, index) => (
               <div key={`w-${percentages[index]}`} className="text-center">
-                <span className="text-sm font-semibold">{weight} kg</span>
+                <span className="text-sm font-semibold text-center">{weight} kg</span>
               </div>
             ))}
           </div>
@@ -39,18 +40,58 @@ export function PercentagesTable({ percentages, weights }: PercentagesTableProps
   )
 }
 
-export function RMCalculator({ onTableData }: RMCalculatorProps) {
+export function RMCalculator({ onTableData, blockId }: RMCalculatorProps) {
   const [maxWeight, setMaxWeight] = useState('')
   const [isExpanded, setIsExpanded] = useState(false)
 
   // Porcentajes: 70, 75, 80, 85, 90, 95, 100
-  const percentages = [70, 75, 80, 85, 90, 95, 100]
+  const percentages = useMemo(() => [70, 75, 80, 85, 90, 95, 100], [])
+
+  // Generar una clave única para localStorage basada en el blockId
+  const storageKey = useMemo(() => blockId ? `rm-calculator-${blockId}` : 'rm-calculator-default', [blockId])
+
+  // Cargar datos guardados al montar el componente
+  useEffect(() => {
+    const savedData = localStorage.getItem(storageKey)
+    if (savedData) {
+      try {
+        const parsedData = JSON.parse(savedData)
+        if (parsedData.maxWeight && parsedData.isExpanded !== undefined) {
+          setMaxWeight(parsedData.maxWeight)
+          setIsExpanded(parsedData.isExpanded)
+          
+          // Calcular y enviar los pesos si hay un peso guardado
+          const numValue = parseFloat(parsedData.maxWeight)
+          if (!isNaN(numValue) && numValue > 0) {
+            const weights = percentages.map(p => {
+              const calculatedWeight = (numValue * p) / 100
+              return calculatedWeight.toFixed(1)
+            })
+            onTableData?.({ percentages, weights })
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved RM data:', error)
+      }
+    }
+  }, [storageKey, onTableData, percentages])
+
+  // Guardar datos cuando cambien
+  useEffect(() => {
+    const dataToSave = {
+      maxWeight,
+      isExpanded
+    }
+    localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+  }, [maxWeight, isExpanded, storageKey])
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded)
     if (!isExpanded) {
       setMaxWeight('')
       onTableData?.(null)
+      // Limpiar datos guardados cuando se cierra
+      localStorage.removeItem(storageKey)
     }
   }
 

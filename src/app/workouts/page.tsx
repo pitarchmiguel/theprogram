@@ -318,6 +318,7 @@ export default function WorkoutsPage() {
                                 {block.category && <CategoryBadge category={block.category} />}
                                 {block.enableRMCalculator && (
                                   <RMCalculator 
+                                    blockId={block.id}
                                     onTableData={(data) => handleTableData(workout.id, data)}
                                   />
                                 )}
