@@ -79,7 +79,8 @@ export function RMCalculator({ onTableData, blockId }: RMCalculatorProps) {
       if (!isNaN(numValue) && numValue > 0) {
         const weights = percentages.map(p => {
           const calculatedWeight = (numValue * p) / 100
-          return calculatedWeight.toFixed(1)
+          // Solo mostrar decimales si tienen valor, si es .0 mostrar solo el entero
+          return calculatedWeight % 1 === 0 ? calculatedWeight.toString() : calculatedWeight.toFixed(1)
         })
         onTableDataRef.current?.({ percentages, weights })
       } else {
