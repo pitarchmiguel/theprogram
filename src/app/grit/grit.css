@@ -1,0 +1,319 @@
+/* ── Reset & base ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  background: #f4f4f4;
+  color: #1a1a1a;
+}
+
+:root {
+  --orange: #E8632A;
+  --dark: #1a1a1a;
+  --gray: #6b6b6b;
+  --light-gray: #d1d1d1;
+}
+
+/* ── App shell ── */
+.grit-app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: #f4f4f4;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.grit-header {
+  background: #fff;
+  border-bottom: 3px solid var(--orange);
+  padding: 16px 16px 0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.grit-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dark);
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+}
+
+/* ── Program tabs ── */
+.program-tabs {
+  display: flex;
+  gap: 0;
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+
+.program-tab {
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -3px;
+  transition: color 0.15s, border-color 0.15s;
+  text-align: center;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.program-tab:hover { color: var(--dark); }
+
+.program-tab.active {
+  color: var(--orange);
+  border-bottom-color: var(--orange);
+}
+
+/* ── Week nav ── */
+.week-nav {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid #ebebeb;
+}
+
+.week-nav-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--dark);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.1s;
+}
+
+.week-nav-btn:hover { background: #f4f4f4; }
+
+.week-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dark);
+  text-transform: capitalize;
+}
+
+/* ── Calendar week row ── */
+.calendar-week {
+  background: #fff;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 8px 8px 12px;
+  border-bottom: 1px solid #ebebeb;
+  gap: 2px;
+}
+
+.day-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 2px 6px;
+  border-radius: 8px;
+  transition: background 0.1s;
+  position: relative;
+}
+
+.day-pill:hover { background: #f4f4f4; }
+
+.day-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.day-num {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dark);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.day-pill.no-wod .day-num {
+  color: var(--light-gray);
+}
+
+.day-pill.selected .day-num {
+  background: #000;
+  color: #fff;
+}
+
+/* Dot for today (when not selected) */
+.day-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--orange);
+  position: absolute;
+  bottom: 2px;
+}
+
+/* ── WOD content area ── */
+.wod-area {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.selected-day-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 12px;
+  text-transform: capitalize;
+}
+
+/* ── WOD card ── */
+.wod-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px;
+  color: var(--gray);
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.empty-sub {
+  font-size: 12px;
+  color: var(--light-gray);
+}
+
+/* ── Loading ── */
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--gray);
+  font-size: 14px;
+}
+
+/* ── WOD HTML styles (rendered from JSON) ── */
+.wod-html .component { margin-bottom: 6px; }
+
+.wod-html .section-header {
+  color: var(--orange);
+  font-weight: 700;
+  font-size: 12px;
+  margin-top: 12px;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wod-html .component:first-child .section-header { margin-top: 0; }
+
+.wod-html .section-italic {
+  color: var(--orange);
+  font-style: italic;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.wod-html .exercise-item {
+  font-weight: 700;
+  font-size: 12px;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+
+.wod-html .exercise-prefix { color: var(--orange); }
+
+.wod-html .attr {
+  font-weight: 400;
+  color: var(--gray);
+  font-size: 10px;
+}
+
+.wod-html .body-text {
+  font-size: 12px;
+  margin-bottom: 1px;
+  line-height: 1.5;
+}
+
+.wod-html .bullet-list {
+  list-style: none;
+  padding-left: 6px;
+  margin: 3px 0;
+}
+
+.wod-html .bullet-list li {
+  font-size: 12px;
+  padding: 1px 0;
+  line-height: 1.4;
+}
+
+.wod-html .bullet-list li::before {
+  content: "• ";
+  color: var(--orange);
+  font-weight: 700;
+}
+
+.wod-html .note {
+  color: var(--gray);
+  font-style: italic;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.wod-html .coaches-note {
+  color: var(--gray);
+  font-style: italic;
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+.wod-html .rest {
+  color: var(--gray);
+  font-style: italic;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.wod-html .component + .component {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 6px;
+}
