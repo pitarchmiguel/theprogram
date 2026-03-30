@@ -311,7 +311,9 @@ body {
   margin-top: 2px;
 }
 
-.wod-html .section-block { margin-bottom: 4px; }
+.wod-html .section-block { margin-bottom: 14px; }
+
+.wod-html .section-block:last-child { margin-bottom: 0; }
 
 .wod-html .component {
   background: #f6f6f6;
