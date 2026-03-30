@@ -231,8 +231,6 @@ body {
 }
 
 /* ── WOD HTML styles (rendered from JSON) ── */
-.wod-html .component { margin-bottom: 6px; }
-
 .wod-html .section-header {
   color: var(--orange);
   font-weight: 700;
@@ -313,25 +311,15 @@ body {
   margin-top: 2px;
 }
 
-.wod-html .section-block {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px 18px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 5px rgba(0,0,0,.07);
-  border: 1px solid #efefef;
-}
+.wod-html .section-block { margin-bottom: 4px; }
 
-.wod-html .section-block:last-child { margin-bottom: 0; }
-
-.wod-html .section-block .component {
+.wod-html .component {
   background: #f6f6f6;
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.wod-html .section-block .component + .component {
-  margin-top: 6px;
-}
-
-.wod-html .section-block .section-header { margin-top: 0; }
+.wod-html .component:last-child { margin-bottom: 0; }
