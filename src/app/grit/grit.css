@@ -317,11 +317,12 @@ body {
 
 .wod-html .component {
   background: #f6f6f6;
-  border-radius: 10px;
   padding: 12px 14px;
-  margin-bottom: 6px;
   width: 100%;
   box-sizing: border-box;
+  border-bottom: 1px solid #e8e8e8;
 }
 
-.wod-html .component:last-child { margin-bottom: 0; }
+.wod-html .section-block .component:first-child { border-radius: 10px 10px 0 0; }
+.wod-html .section-block .component:last-child  { border-radius: 0 0 10px 10px; border-bottom: none; }
+.wod-html .section-block .component:only-child  { border-radius: 10px; border-bottom: none; }
